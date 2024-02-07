@@ -3,10 +3,12 @@ import sys
 import asyncio
 from shazamio import Shazam
 from tqdm.asyncio import tqdm
+from unidecode import unidecode  # Import unidecode
 
 
 def sanitize_filename(filename):
-    """Sanitize the filename to avoid invalid characters and adjust casing."""
+    """Sanitize the filename to avoid invalid characters, adjust casing, transliterate to Latin, and ensure non-emptiness."""
+    filename = unidecode(filename)  # Transliterate to Latin characters
     invalid_chars = '<>:"/\\|?*'
     for char in invalid_chars:
         filename = filename.replace(char, '')
@@ -14,6 +16,9 @@ def sanitize_filename(filename):
     filename = filename.replace('&', '-')
     # Change uppercase words to capitalize
     filename = ' '.join(word.capitalize() for word in filename.split())
+    if not filename.strip():
+        print("The filename became empty after sanitization.")
+        filename = "Unnamed_File"
     return filename
 
 
@@ -25,8 +30,12 @@ async def recognize_and_rename_song(file_path, shazam):
         # Apply transformations to the title and author
         sanitized_title = sanitize_filename(title)
         sanitized_author = sanitize_filename(author)
-        # Construct the new filename
-        new_filename = f"{sanitized_title} - {sanitized_author}.mp3"
+
+        # Construct the new filename while avoiding a useless '-' when either part is missing
+        new_filename_components = [sanitized_title, sanitized_author]
+        new_filename = " - ".join(filter(None,
+                                  new_filename_components)) + ".mp3"
+
         # Get the directory of the original file
         directory = os.path.dirname(file_path)
         new_file_path = os.path.join(directory, new_filename)
