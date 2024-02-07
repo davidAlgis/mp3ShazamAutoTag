@@ -2,24 +2,44 @@ import os
 import sys
 import asyncio
 from shazamio import Shazam
-# Ensure you're using the asyncio version of tqdm for compatibility
 from tqdm.asyncio import tqdm
 
 
-async def recognize_song(file_path, shazam):
+def sanitize_filename(filename):
+    """Sanitize the filename to avoid invalid characters and adjust casing."""
+    invalid_chars = '<>:"/\\|?*'
+    for char in invalid_chars:
+        filename = filename.replace(char, '')
+    # Replace '&' with '-'
+    filename = filename.replace('&', '-')
+    # Change uppercase words to capitalize
+    filename = ' '.join(word.capitalize() for word in filename.split())
+    return filename
+
+
+async def recognize_and_rename_song(file_path, shazam):
     try:
         out = await shazam.recognize_song(file_path)
         title = out['track']['title']
         author = out['track']['subtitle']
-        cover_link = out['track']['images']['coverart']
+        # Apply transformations to the title and author
+        sanitized_title = sanitize_filename(title)
+        sanitized_author = sanitize_filename(author)
+        # Construct the new filename
+        new_filename = f"{sanitized_title} - {sanitized_author}.mp3"
+        # Get the directory of the original file
+        directory = os.path.dirname(file_path)
+        new_file_path = os.path.join(directory, new_filename)
+        # Rename the file
+        os.rename(file_path, new_file_path)
         return {
-            'file_path': file_path,  # Include file path for reference
+            'file_path': file_path,
+            'new_file_path': new_file_path,
             'title': title,
-            'author': author,
-            'cover_link': cover_link
+            'author': author
         }
     except Exception as e:
-        print(f"Error recognizing {file_path}: {e}")
+        print(f"Error recognizing or renaming {file_path}: {e}")
         return {'file_path': file_path, 'error': str(e)}
 
 
@@ -32,15 +52,15 @@ async def find_and_recognize_mp3_files(folder_path):
     results = []
 
     # Process each file sequentially with a progress bar
-    async for file_path in tqdm(mp3_files, desc="Recognizing Songs"):
-        result = await recognize_song(file_path, shazam)
+    async for file_path in tqdm(mp3_files, desc="Recognizing and Renaming Songs"):
+        result = await recognize_and_rename_song(file_path, shazam)
         results.append(result)
 
     # Print results after all files have been processed
     for result in results:
         if 'error' not in result:
             print(
-                f"File: {result['file_path']} - Title: {result['title']}, Author: {result['author']}, Cover Link: {result['cover_link']}")
+                f"Renamed: {result['file_path']} -> {result['new_file_path']}")
         else:
             print(f"File: {result['file_path']} - Error: {result['error']}")
 
