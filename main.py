@@ -4,6 +4,17 @@ import asyncio
 from shazamio import Shazam
 from tqdm.asyncio import tqdm
 from unidecode import unidecode  # Import unidecode
+import eyed3
+
+
+def update_mp3_tags(file_path, title, artist):
+    """Update the MP3 tags of the given file with the specified title and artist."""
+    audiofile = eyed3.load(file_path)
+    if audiofile.tag is None:  # If the file has no tags, create a new tag file
+        audiofile.initTag()
+    audiofile.tag.title = title
+    audiofile.tag.artist = artist
+    audiofile.tag.save()
 
 
 def sanitize_filename(filename):
@@ -39,8 +50,13 @@ async def recognize_and_rename_song(file_path, shazam):
         # Get the directory of the original file
         directory = os.path.dirname(file_path)
         new_file_path = os.path.join(directory, new_filename)
+
         # Rename the file
         os.rename(file_path, new_file_path)
+
+        # Update MP3 tags
+        update_mp3_tags(new_file_path, title, author)
+
         return {
             'file_path': file_path,
             'new_file_path': new_file_path,
