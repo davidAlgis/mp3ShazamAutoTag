@@ -4,7 +4,28 @@ import asyncio
 from shazamio import Shazam
 from tqdm.asyncio import tqdm
 from unidecode import unidecode  # Import unidecode
+import requests
 import eyed3
+from eyed3.id3.frames import ImageFrame
+
+
+def update_mp3_cover_art(file_path, cover_url):
+    """Update the cover art of the MP3 file using the image from the given URL."""
+    audiofile = eyed3.load(file_path)
+    if audiofile.tag is None:
+        audiofile.initTag()
+
+    # Download the image from the cover URL
+    response = requests.get(cover_url)
+    if response.status_code == 200:
+        # Remove existing images
+        audiofile.tag.images.remove(ImageFrame.FRONT_COVER)
+        # Add new image
+        audiofile.tag.images.set(
+            ImageFrame.FRONT_COVER, response.content, "image/jpeg")
+        audiofile.tag.save()
+    else:
+        print(f"Failed to download cover art from {cover_url}")
 
 
 def update_mp3_tags(file_path, title, artist):
@@ -18,8 +39,15 @@ def update_mp3_tags(file_path, title, artist):
 
 
 def sanitize_filename(filename):
-    """Sanitize the filename to avoid invalid characters, adjust casing, transliterate to Latin, and ensure non-emptiness."""
+    """Sanitize the filename to avoid invalid characters, adjust casing, transliterate to Latin, and ensure non-emptiness.
+    If transliteration results in an empty string, use the original non-Unicode characters."""
+    original_filename = filename  # Store the original filename
     filename = unidecode(filename)  # Transliterate to Latin characters
+
+    # If transliteration results in an empty string, revert to the original filename
+    if not filename.strip():
+        filename = original_filename
+
     invalid_chars = '<>:"/\\|?*'
     for char in invalid_chars:
         filename = filename.replace(char, '')
@@ -27,9 +55,12 @@ def sanitize_filename(filename):
     filename = filename.replace('&', '-')
     # Change uppercase words to capitalize
     filename = ' '.join(word.capitalize() for word in filename.split())
+
+    # Final check to ensure filename is not empty after all transformations
     if not filename.strip():
-        print("The filename became empty after sanitization.")
+        print("\nWarning: Filename became empty after sanitization.")
         filename = "Unnamed_File"
+
     return filename
 
 
@@ -38,6 +69,9 @@ async def recognize_and_rename_song(file_path, shazam):
         out = await shazam.recognize_song(file_path)
         title = out['track']['title']
         author = out['track']['subtitle']
+        # Get the cover art link
+        cover_link = out['track']['images']['coverart']
+
         # Apply transformations to the title and author
         sanitized_title = sanitize_filename(title)
         sanitized_author = sanitize_filename(author)
@@ -56,6 +90,7 @@ async def recognize_and_rename_song(file_path, shazam):
 
         # Update MP3 tags
         update_mp3_tags(new_file_path, title, author)
+        # update_mp3_cover_art(new_file_path, cover_link)
 
         return {
             'file_path': file_path,
