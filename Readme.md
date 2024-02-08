@@ -12,14 +12,19 @@ pip install -r requirements.txt
 
 ## Usage
 
-Ensure you have Python 3.6 or newer installed on your system.
+Ensure you have Python 3.6 or newer installed on your system (there might be some problem with 3.11 and 3.12 (cf. issue https://github.com/davidAlgis/mp3ShazamAutoTag/issues/1).
 Clone this repository or download the script and requirements.txt file.
 Install the required libraries as mentioned above.
-Run the script by specifying the directory containing your MP3 files:
+To use the script, run it from the command line with the desired options:
 
 ```
-python recognize_and_rename_song.py /path/to/your/mp3/files
+python main.py  [options]
 ```
 
-If no path is specified, the script will use the directory where the script is located as the default directory to process MP3 files.
-Requirements
+## Options
+
+- `-d`, `--directory` <directory>: Specify the directory where MP3 files are located for processing. If not specified, the script uses its current directory.
+- `-t`, `--test`: Execute a test function to verify the script's functionality. It looks for a file named "fileToTest.mp3" in a test folder and checks the renaming process.
+- `-m`, `--modify` <True/False>: Indicate whether the script should apply modifications to the MP3 tags and filenames. Defaults to True.
+- `-de`, `--delay` <delay>: Specify a delay (in seconds) to wait before retrying the Shazam API call if the initial attempt fails. Defaults to 10 seconds.
+- `-h`, `--help`: Display help information showing all command-line options.
