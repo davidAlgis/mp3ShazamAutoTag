@@ -202,16 +202,20 @@ async def find_and_recognize_mp3_files(folder_path, modify=True, delay=10, nbrRe
         action = "Renamed"
     else:
         action = "Will be renamed in:"
-    print("\n\n------------------------------- End Recognize and Rename Process -------------------------------\n\n")
+    if (trace):
+        print("\n\n------------------------------- End Recognize and Rename Process -------------------------------\n\n")
     # Print results after all files have been processed
     succeed = 0
     for result in results:
         if 'error' not in result:
             succeed += 1
-            print(
-                f"{action}: {result['file_path']} -> {result['new_file_path']}")
+            if (trace):
+                print(
+                    f"{action}: {result['file_path']} -> {result['new_file_path']}")
         else:
-            print(f"File: {result['file_path']} - Error: {result['error']}")
+            if (trace):
+                print(
+                    f"File: {result['file_path']} - Error: {result['error']}")
     print(f"Succeed {succeed}/{len(results)}.")
 
 
@@ -248,6 +252,17 @@ async def test():
         print("Test Failed: The file was not correctly renamed.")
 
 
+def str2bool(v):
+    if isinstance(v, bool):
+        return v
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
+
+
 async def main():
     # Set up argument parsing
     parser = argparse.ArgumentParser(
@@ -256,14 +271,15 @@ async def main():
                         default=os.path.dirname(os.path.realpath(__file__)))
     parser.add_argument("-te", "--test", action="store_true",
                         help="Call the test function.")
-    parser.add_argument("-m", "--modify", type=bool, default=True,
+    parser.add_argument("-m", "--modify", type=str2bool, nargs='?', const=True, default=True,
                         help="Indicate if modifications to tag and file name should be applied. (default is true)")
     parser.add_argument("-de", "--delay", type=int, default=10,
                         help="Specify a delay in seconds between retries if the Shazam API call fails. (default 10 seconds, reduce it to improve performances)")
     parser.add_argument("-n", "--nbrRetry", type=int, default=10,
                         help="Specify the number of retries for Shazam API call if it fails. (default 10 try, reduce it to improve performances)")
-    parser.add_argument("-tr", "--trace", type=bool, default=True,
+    parser.add_argument("-tr", "--trace", type=str2bool, nargs='?', const=True, default=False,
                         help="Enable tracing to print messages during the recognition and renaming process.")
+
     args = parser.parse_args()
 
     # Handle the test argument
