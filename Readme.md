@@ -23,8 +23,17 @@ python main.py  [options]
 
 ## Options
 
-- `-d`, `--directory` <directory>: Specify the directory where MP3 files are located for processing. If not specified, the script uses its current directory.
-- `-t`, `--test`: Execute a test function to verify the script's functionality. It looks for a file named "fileToTest.mp3" in a test folder and checks the renaming process.
-- `-m`, `--modify` <True/False>: Indicate whether the script should apply modifications to the MP3 tags and filenames. Defaults to True.
+- `-di`, `--directory` <directory>: Specify the directory where MP3 files are located for processing. If not specified, the script uses its current directory.
+
+- `-t`, `--test`: Execute a test function to verify the script's functionality. It looks for a file named "fileToTest.mp3" in a `test` folder and checks the renaming process.
+
+- `-m`, `--modify` <True/False>: Indicate whether the script should apply modifications to the MP3 tags and filenames. Defaults to `True`.
+
 - `-de`, `--delay` <delay>: Specify a delay (in seconds) to wait before retrying the Shazam API call if the initial attempt fails. Defaults to 10 seconds.
+
+- `-n`, `--nbrRetry` <number>: Specify the number of retries for the Shazam API call if it fails. Defaults to 10 tries.
+
+- `-tr`, `--trace`: Enable tracing to print messages during the recognition and renaming process. Useful for debugging or monitoring script progress.
+
 - `-h`, `--help`: Display help information showing all command-line options.
+
