@@ -66,6 +66,18 @@ def sanitize_filename(filename, trace):
     original_filename = filename  # Store the original filename
     filename = unidecode(filename)  # Attempt to transliterate to ASCII
 
+    # Manually remove content within parentheses
+    new_filename = ""
+    skip = 0
+    for char in filename:
+        if char == '(':
+            skip += 1
+        elif char == ')' and skip > 0:
+            skip -= 1
+        elif skip == 0:
+            new_filename += char
+    filename = new_filename
+
     # Revert to the original filename if transliteration results in an empty string
     if not filename.strip():
         filename = original_filename
@@ -81,7 +93,7 @@ def sanitize_filename(filename, trace):
     if not filename.strip():
         if (trace):
             print("\nWarning: Filename became empty after sanitization.")
-        filename = "Unnamed_File"  # Default filename if all else fails
+        filename = original_filename  # Default filename if all else fails
 
     return filename
 
@@ -124,46 +136,46 @@ async def recognize_and_rename_song(file_path, file_name, shazam, modify=True, d
     cover_link = images.get('coverart', '')  # Default to empty if no cover art
     if (title == 'Unknown Title' and trace):
         print(f"\nCould not recognize {file_name}, will not modify it.")
-        new_file_path = file_path
-    else:
-        # Sanitize, rename, and update MP3 file
-        sanitized_title = sanitize_filename(title, trace)
-        sanitized_author = sanitize_filename(author, trace)
-        new_filename_components = [sanitized_title, sanitized_author]
-        new_filename = " - ".join(filter(None,
-                                  new_filename_components)) + ".mp3"
-        directory = os.path.dirname(file_path)
+        return {'file_path': file_name, 'error': 'Could not recognize file'}
+
+    # Sanitize, rename, and update MP3 file
+    sanitized_title = sanitize_filename(title, trace)
+    sanitized_author = sanitize_filename(author, trace)
+    new_filename_components = [sanitized_title, sanitized_author]
+    new_filename = " - ".join(filter(None,
+                              new_filename_components)) + ".mp3"
+    directory = os.path.dirname(file_path)
+    new_file_path = os.path.join(directory, new_filename)
+
+    # Check if a file with the new name already exists and append a number to make it unique
+    counter = 1
+    base_new_filename = new_filename
+    while os.path.exists(new_file_path):
+        if (new_filename == file_name):
+            break
+        if (trace):
+            print(
+                f"\nWarning: File {new_file_path} already exists. Trying a new name.")
+        new_filename = os.path.splitext(base_new_filename)[
+            0] + f" ({counter})" + os.path.splitext(base_new_filename)[1]
         new_file_path = os.path.join(directory, new_filename)
+        counter += 1
 
-        # Check if a file with the new name already exists and append a number to make it unique
-        counter = 1
-        base_new_filename = new_filename
-        while os.path.exists(new_file_path):
-            if (new_filename == file_name):
-                break
+    if (modify):
+        os.rename(file_path, new_file_path)
+
+        # Update tags and cover art
+        try:
+            update_mp3_tags(new_file_path, sanitized_title, sanitized_author)
+        except Exception as e:
             if (trace):
-                print(
-                    f"\nWarning: File {new_file_path} already exists. Trying a new name.")
-            new_filename = os.path.splitext(base_new_filename)[
-                0] + f" ({counter})" + os.path.splitext(base_new_filename)[1]
-            new_file_path = os.path.join(directory, new_filename)
-            counter += 1
-
-        if (modify):
-            os.rename(file_path, new_file_path)
-
-            # Update tags and cover art
-            try:
-                update_mp3_tags(new_file_path, title, author)
-            except Exception as e:
-                if (trace):
-                    print(f"\nError updating mp3 tag {file_path}: {e}")
-                return {'file_path': file_path, 'error': str(e)}
-            try:
-                update_mp3_cover_art(new_file_path, cover_link, trace)
-            except Exception as e:
-                if (trace):
-                    print(f"\nError updating cover {file_path}: {e}")
+                print(f"\nError updating mp3 tag {file_path}: {e}")
+            return {'file_path': file_path, 'error': str(e)}
+        try:
+            update_mp3_cover_art(new_file_path, cover_link, trace)
+        except Exception as e:
+            if (trace):
+                print(f"\nError updating cover {file_path}: {e}")
 
     return {
         'file_path': file_path,
