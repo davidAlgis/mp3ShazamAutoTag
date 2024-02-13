@@ -93,7 +93,7 @@ def sanitize_filename(filename, trace):
     if not filename.strip():
         if (trace):
             print("\nWarning: Filename became empty after sanitization.")
-        filename = original_filename  # Default filename if all else fails
+        filename = "Unknown song"  # Default filename if all else fails
 
     return filename
 
