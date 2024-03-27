@@ -112,7 +112,7 @@ async def recognize_and_rename_song(file_path, file_name, shazam, modify=True, d
     errorStr = ""
     while attempt < nbrRetry:
         try:
-            out = await shazam.recognize_song(file_path)
+            out = await shazam.recognize(file_path)
             if out:  # Assuming 'out' being non-empty means success
                 break
         except Exception as e:
