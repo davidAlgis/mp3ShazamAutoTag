@@ -43,9 +43,7 @@ def update_mp3_cover_art(file_path, cover_url, trace):
     audiofile.tag.save()
 
 
-def update_mp3_tags(
-    file_path: str, title: str, artist: str, album: str
-):
+def update_mp3_tags(file_path: str, title: str, artist: str, album: str):
     """
     Update the MP3 tags of the given file with the specified title and artist.
 
@@ -170,7 +168,9 @@ async def recognize_and_rename_song(
     sanitized_title = sanitize_string(title, trace)
     sanitized_author = sanitize_string(author, trace)
     sanitized_album = sanitize_string(album, trace)
-    new_filename_components = [sanitized_title, sanitized_author, sanitized_album]
+    new_filename_components = [
+        sanitized_title, sanitized_author, sanitized_album
+    ]
     new_filename = " - ".join(filter(None, new_filename_components)) + ".mp3"
     directory = os.path.dirname(file_path)
     new_file_path = os.path.join(directory, new_filename)
@@ -182,12 +182,12 @@ async def recognize_and_rename_song(
         if new_filename == file_name:
             break
         if trace:
-            print(f"\nWarning: File {new_file_path} already exists. Trying a new name.")
-        new_filename = (
-            os.path.splitext(base_new_filename)[0]
-            + f" ({counter})"
-            + os.path.splitext(base_new_filename)[1]
-        )
+            print(
+                f"\nWarning: File {new_file_path} already exists. Trying a new name."
+            )
+        new_filename = (os.path.splitext(base_new_filename)[0] +
+                        f" ({counter})" +
+                        os.path.splitext(base_new_filename)[1])
         new_file_path = os.path.join(directory, new_filename)
         counter += 1
 
@@ -196,9 +196,8 @@ async def recognize_and_rename_song(
         # new_file_path = file_path
         # Update tags and cover art
         try:
-            update_mp3_tags(
-                new_file_path, sanitized_title, sanitized_author, sanitized_album
-            )
+            update_mp3_tags(new_file_path, sanitized_title, sanitized_author,
+                            sanitized_album)
         except Exception as e:
             if trace:
                 print(f"\nError updating mp3 tag {file_path}: {e}")
@@ -218,9 +217,11 @@ async def recognize_and_rename_song(
     }
 
 
-async def find_and_recognize_mp3_files(
-    folder_path, modify=True, delay=10, nbrRetry=3, trace=False
-):
+async def find_and_recognize_mp3_files(folder_path,
+                                       modify=True,
+                                       delay=10,
+                                       nbrRetry=3,
+                                       trace=False):
     mp3_files_path = []
     test_folder_name = "test"  # Name of the test folder to exclude
     trace = True
@@ -239,10 +240,11 @@ async def find_and_recognize_mp3_files(
     results = []
 
     # Process each MP3 file not in the 'test' folder
-    async for file_path in tqdm(mp3_files_path, desc="Recognizing and Renaming Songs"):
-        result = await recognize_and_rename_song(
-            file_path[1], file_path[0], shazam, modify, delay, nbrRetry, trace
-        )
+    async for file_path in tqdm(mp3_files_path,
+                                desc="Recognizing and Renaming Songs"):
+        result = await recognize_and_rename_song(file_path[1], file_path[0],
+                                                 shazam, modify, delay,
+                                                 nbrRetry, trace)
         results.append(result)
 
     action = ""
@@ -260,19 +262,22 @@ async def find_and_recognize_mp3_files(
         if "error" not in result:
             succeed += 1
             if trace:
-                print(f"{action}: {result['file_path']} -> {result['new_file_path']}")
+                print(
+                    f"{action}: {result['file_path']} -> {result['new_file_path']}"
+                )
         else:
             if trace:
-                print(f"File: {result['file_path']} - Error: {result['error']}")
+                print(
+                    f"File: {result['file_path']} - Error: {result['error']}")
     print(f"Succeed {succeed}/{len(results)}.")
 
 
 async def test():
-    test_folder = os.path.join(os.path.dirname(os.path.realpath(__file__)), "test")
+    test_folder = os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                               "test")
     test_file_path = os.path.join(test_folder, "fileToTest.mp3")
     expected_new_file_path = os.path.join(
-        test_folder, "Gerudo Valley - The Legend Of Zelda.mp3"
-    )
+        test_folder, "Gerudo Valley - The Legend Of Zelda.mp3")
 
     # if the file Gerudo Valley (live) - The Legend Of Zelda.mp3 exists we rename it to fileToTest.mp3
     if os.path.exists(expected_new_file_path):
@@ -280,16 +285,20 @@ async def test():
 
     # Check if the test file exists
     if not os.path.exists(test_file_path):
-        print("Error: The test file does not exist, so the test could not be launched.")
+        print(
+            "Error: The test file does not exist, so the test could not be launched."
+        )
         return
 
     # Apply the recognize_and_rename_song function on this file
     # Assuming shazam is an initialized instance of the Shazam client you would use in your actual script
-    shazam = Shazam()  # You may need to adjust based on your actual initialization
+    shazam = Shazam(
+    )  # You may need to adjust based on your actual initialization
     modify = True  # Assuming you want to apply modifications in the test
 
     # Call the function synchronously for simplicity in demonstration, adjust as needed
-    await recognize_and_rename_song(test_file_path, "fileToTest.mp3", shazam, modify)
+    await recognize_and_rename_song(test_file_path, "fileToTest.mp3", shazam,
+                                    modify)
 
     # Check if the file was correctly renamed
     if os.path.exists(expected_new_file_path):
@@ -316,17 +325,20 @@ def str2bool(v):
 async def main():
     # Set up argument parsing
     parser = argparse.ArgumentParser(
-        description="Process MP3 files with Shazam recognition and optional renaming and tagging."
+        description=
+        "Process MP3 files with Shazam recognition and optional renaming and tagging."
     )
     parser.add_argument(
         "-di",
         "--directory",
-        help="Specify the directory to process MP3 files. (default is current folder)",
+        help=
+        "Specify the directory to process MP3 files. (default is current folder)",
         default=os.path.dirname(os.path.realpath(__file__)),
     )
-    parser.add_argument(
-        "-te", "--test", action="store_true", help="Call the test function."
-    )
+    parser.add_argument("-te",
+                        "--test",
+                        action="store_true",
+                        help="Call the test function.")
     parser.add_argument(
         "-m",
         "--modify",
@@ -334,21 +346,24 @@ async def main():
         nargs="?",
         const=True,
         default=True,
-        help="Indicate if modifications to tag and file name should be applied. (default is true)",
+        help=
+        "Indicate if modifications to tag and file name should be applied. (default is true)",
     )
     parser.add_argument(
         "-de",
         "--delay",
         type=int,
         default=10,
-        help="Specify a delay in seconds between retries if the Shazam API call fails. (default 10 seconds, reduce it to improve performances)",
+        help=
+        "Specify a delay in seconds between retries if the Shazam API call fails. (default 10 seconds, reduce it to improve performances)",
     )
     parser.add_argument(
         "-n",
         "--nbrRetry",
         type=int,
         default=10,
-        help="Specify the number of retries for Shazam API call if it fails. (default 10 try, reduce it to improve performances)",
+        help=
+        "Specify the number of retries for Shazam API call if it fails. (default 10 try, reduce it to improve performances)",
     )
     parser.add_argument(
         "-tr",
@@ -357,7 +372,8 @@ async def main():
         nargs="?",
         const=True,
         default=False,
-        help="Enable tracing to print messages during the recognition and renaming process.",
+        help=
+        "Enable tracing to print messages during the recognition and renaming process.",
     )
 
     args = parser.parse_args()
@@ -368,13 +384,11 @@ async def main():
         return  # Exit after test function if test argument is provided
 
     # Handle the directory argument
-    folder_path = (
-        args.directory if args.directory else os.path.dirname(os.path.realpath(__file__))
-    )
+    folder_path = (args.directory if args.directory else os.path.dirname(
+        os.path.realpath(__file__)))
 
-    await find_and_recognize_mp3_files(
-        args.directory, args.modify, args.delay, args.nbrRetry, args.trace
-    )
+    await find_and_recognize_mp3_files(args.directory, args.modify, args.delay,
+                                       args.nbrRetry, args.trace)
 
 
 if __name__ == "__main__":
