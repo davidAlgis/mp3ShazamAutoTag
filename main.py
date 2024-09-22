@@ -224,6 +224,11 @@ async def find_and_recognize_mp3_files(folder_path,
                                        trace=False):
     mp3_files_path = []
     test_folder_name = "test"  # Name of the test folder to exclude
+    if (test_folder_name in folder_path):
+        print(
+            "Cannot recognize mp3 files from a folder name \"test\". Please use another name."
+        )
+        return
     trace = True
     for root, dirs, files in os.walk(folder_path):
         # Skip files in the test folder by checking if 'test' is part of the current root path
