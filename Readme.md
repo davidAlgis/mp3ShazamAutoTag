@@ -12,7 +12,7 @@ pip install -r requirements.txt
 
 ## Usage
 
-Ensure you have Python 3.6 or newer installed on your system (there might be some problem with 3.11 and 3.12 (cf. issue https://github.com/davidAlgis/mp3ShazamAutoTag/issues/1).
+Ensure you have Python 3.6 or newer installed on your system, there might be some problem with 3.11 and 3.12 (cf. issue https://github.com/davidAlgis/mp3ShazamAutoTag/issues/1). Also MacOS seems to have some problems to install shazamio, maybe it's necessary to install it manually (cf. issue https://github.com/davidAlgis/mp3ShazamAutoTag/issues/5).
 Clone this repository or download the script and requirements.txt file.
 Install the required libraries as mentioned above.
 To use the script, run it from the command line with the desired options:
