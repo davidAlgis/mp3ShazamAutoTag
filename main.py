@@ -281,8 +281,8 @@ async def test():
     test_folder = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                                "test")
     test_file_path = os.path.join(test_folder, "fileToTest.mp3")
-    expected_new_file_path = os.path.join(
-        test_folder, "Gerudo Valley - The Legend Of Zelda.mp3")
+    expected_new_name = "Drive My Car - The Beatles - Rubber Soul.mp3"
+    expected_new_file_path = os.path.join(test_folder, expected_new_name)
 
     # if the file Gerudo Valley (live) - The Legend Of Zelda.mp3 exists we rename it to fileToTest.mp3
     if os.path.exists(expected_new_file_path):
@@ -308,7 +308,7 @@ async def test():
     # Check if the file was correctly renamed
     if os.path.exists(expected_new_file_path):
         print(
-            "Test Success: The file was correctly renamed to 'Gerudo Valley (live) - The Legend Of Zelda.mp3'."
+            f"Test Success: The file was correctly renamed to \"{expected_new_name}\"."
         )
         # Rename the file back to its original name for other tests
         os.rename(expected_new_file_path, test_file_path)
