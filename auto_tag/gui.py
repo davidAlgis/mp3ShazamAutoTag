@@ -19,6 +19,7 @@ class MP3RenamerGUI:
         self.root = root
         self.root.title("MP3 Auto-Title & Tagger")
         self.data = []  # List of dicts with result info and an "apply" flag.
+        self.editing_entry = None  # Reference to the current editing Entry widget.
 
         # Top Frame: Directory input and browse button.
         top_frame = ttk.Frame(root, padding="10")
@@ -77,10 +78,11 @@ class MP3RenamerGUI:
         self.tree.configure(yscrollcommand=scrollbar.set)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
-        # Bind mouse click event to toggle the "Apply" flag.
+        # Bind events:
         self.tree.bind("<Button-1>", self.on_tree_click)
-        # Bind the Return (Enter) key to toggle the "Apply" flag on the focused row.
         self.tree.bind("<Return>", self.on_enter)
+        # Bind double-click for editing new name cells.
+        self.tree.bind("<Double-1>", self.on_double_click)
 
         # Bottom Frame: Apply and Check/Uncheck buttons.
         bottom_frame = ttk.Frame(root, padding="10")
@@ -196,7 +198,7 @@ class MP3RenamerGUI:
             self.tree.set(row_id, "apply", new_value)
 
     def on_enter(self, event):
-        # When Enter is pressed, toggle the "Apply" flag for the currently focused row.
+        # Toggle the "Apply" flag for the focused row when Enter is pressed.
         row_id = self.tree.focus()
         if not row_id:
             return
@@ -204,6 +206,50 @@ class MP3RenamerGUI:
         self.data[index]["apply"] = not self.data[index].get("apply", True)
         new_value = "Yes" if self.data[index]["apply"] else "No"
         self.tree.set(row_id, "apply", new_value)
+
+    def on_double_click(self, event):
+        # Determine which cell was double-clicked.
+        region = self.tree.identify("region", event.x, event.y)
+        if region != "cell":
+            return
+        column = self.tree.identify_column(event.x)
+        # We only allow editing on the "New Name" column (third column, i.e. "#3").
+        if column != "#3":
+            return
+        row_id = self.tree.identify_row(event.y)
+        if not row_id:
+            return
+        x, y, width, height = self.tree.bbox(row_id, column)
+        # Get the current text.
+        current_text = self.tree.set(row_id, "new")
+        # Create an Entry widget over the cell.
+        self.editing_entry = tk.Entry(self.tree)
+        self.editing_entry.place(x=x, y=y, width=width, height=height)
+        self.editing_entry.insert(0, current_text)
+        self.editing_entry.focus()
+        # Bind Return key and focus out to finish editing.
+        self.editing_entry.bind("<Return>",
+                                lambda e: self.finish_editing(row_id))
+        self.editing_entry.bind("<FocusOut>",
+                                lambda e: self.finish_editing(row_id))
+
+    def finish_editing(self, row_id):
+        if self.editing_entry:
+            new_value = self.editing_entry.get()
+            self.tree.set(row_id, "new", new_value)
+            # Update the underlying data. Use the row index.
+            index = self.tree.index(row_id)
+            # Here we also update the "new_file_path" based on the new value.
+            # For example, we assume the new value should become the basename of the new file path.
+            old_new_path = self.data[index].get("new_file_path", "")
+            dir_path = os.path.dirname(old_new_path) if old_new_path else ""
+            if dir_path:
+                self.data[index]["new_file_path"] = os.path.join(
+                    dir_path, new_value)
+            else:
+                self.data[index]["new_file_path"] = new_value
+            self.editing_entry.destroy()
+            self.editing_entry = None
 
     def sort_by(self, key):
         if key == "old":
