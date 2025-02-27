@@ -18,12 +18,11 @@ class MP3RenamerGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("MP3 Auto-Title & Tagger")
-        self.row_widgets = []  # Each element: (checkbox_var, result_dict)
+        self.data = []  # List of dicts with result info and an "apply" flag.
 
         # Top Frame: Directory input and browse button.
         top_frame = ttk.Frame(root, padding="10")
         top_frame.pack(side=tk.TOP, fill=tk.X)
-
         ttk.Label(top_frame, text="Input Directory:").pack(side=tk.LEFT)
         self.dir_var = tk.StringVar()
         self.dir_entry = ttk.Entry(top_frame,
@@ -35,71 +34,42 @@ class MP3RenamerGUI:
                                 command=self.browse_directory)
         browse_btn.pack(side=tk.LEFT, padx=5)
 
-        # Progress bar frame to include both the bar and the info label.
+        # Progress bar frame: includes the bar and an info label.
         progress_frame = ttk.Frame(root, padding="10")
         progress_frame.pack(fill=tk.X)
-
-        # Progress bar.
         self.progress = ttk.Progressbar(progress_frame, mode="determinate")
         self.progress.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 10))
-
-        # Progress info label.
         self.progress_info = ttk.Label(progress_frame,
                                        text="0/0, Remaining: 0 sec")
         self.progress_info.pack(side=tk.LEFT)
 
-        # Middle Frame: Scrollable area for MP3 files.
-        mid_frame = ttk.Frame(root, padding="10")
-        mid_frame.pack(fill=tk.BOTH, expand=True)
+        # Middle Frame: Treeview for displaying MP3 file info.
+        tree_frame = ttk.Frame(root, padding="10")
+        tree_frame.pack(fill=tk.BOTH, expand=True)
+        self.tree = ttk.Treeview(tree_frame,
+                                 columns=("apply", "old", "new"),
+                                 show="headings")
+        self.tree.heading("apply", text="Apply")
+        self.tree.heading("old",
+                          text="Old Name",
+                          command=lambda: self.sort_by("old"))
+        self.tree.heading("new",
+                          text="New Name",
+                          command=lambda: self.sort_by("new"))
+        self.tree.column("apply", width=80, anchor="center")
+        self.tree.column("old", width=300, anchor="w")
+        self.tree.column("new", width=300, anchor="w")
+        self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-        # Create a canvas and a vertical scrollbar for the frame.
-        self.canvas = tk.Canvas(mid_frame)
-        self.scrollbar = ttk.Scrollbar(mid_frame,
-                                       orient="vertical",
-                                       command=self.canvas.yview)
-        self.scrollable_frame = ttk.Frame(self.canvas)
+        # Allow user to adjust column widths by adding a scrollbar.
+        scrollbar = ttk.Scrollbar(tree_frame,
+                                  orient="vertical",
+                                  command=self.tree.yview)
+        self.tree.configure(yscrollcommand=scrollbar.set)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
-        self.scrollable_frame.bind(
-            "<Configure>", lambda e: self.canvas.configure(scrollregion=self.
-                                                           canvas.bbox("all")))
-
-        self.canvas.create_window((0, 0),
-                                  window=self.scrollable_frame,
-                                  anchor="nw")
-        self.canvas.configure(yscrollcommand=self.scrollbar.set)
-
-        self.canvas.pack(side="left", fill="both", expand=True)
-        self.scrollbar.pack(side="right", fill="y")
-
-        # Header row for the table.
-        header_frame = ttk.Frame(self.scrollable_frame)
-        header_frame.pack(fill=tk.X)
-        header_label_apply = ttk.Label(header_frame,
-                                       text="Apply",
-                                       anchor="center",
-                                       relief="ridge")
-        header_label_old = ttk.Label(header_frame,
-                                     text="Old Name",
-                                     anchor="center",
-                                     relief="ridge")
-        header_label_new = ttk.Label(header_frame,
-                                     text="New Name",
-                                     anchor="center",
-                                     relief="ridge")
-        header_label_apply.grid(row=0, column=0, sticky="nsew")
-        header_label_old.grid(row=0, column=1, sticky="nsew")
-        header_label_new.grid(row=0, column=2, sticky="nsew")
-        # Set uniform column widths.
-        header_frame.grid_columnconfigure(0, weight=1, uniform="group")
-        header_frame.grid_columnconfigure(1, weight=3, uniform="group")
-        header_frame.grid_columnconfigure(2, weight=3, uniform="group")
-        # Bind clicks for sorting.
-        header_label_old.bind("<Button-1>", lambda e: self.sort_by_old_name())
-        header_label_new.bind("<Button-1>", lambda e: self.sort_by_new_name())
-
-        # Container for file rows.
-        self.rows_container = ttk.Frame(self.scrollable_frame)
-        self.rows_container.pack(fill=tk.BOTH, expand=True)
+        # Bind click event to toggle the "Apply" flag.
+        self.tree.bind("<Button-1>", self.on_tree_click)
 
         # Bottom Frame: Apply button.
         bottom_frame = ttk.Frame(root, padding="10")
@@ -116,35 +86,27 @@ class MP3RenamerGUI:
         directory = filedialog.askdirectory()
         if directory:
             self.dir_var.set(directory)
-            # Start the recognition process.
             self.start_recognition(directory)
 
     def start_recognition(self, directory):
-        # Clear any previous rows.
-        for widget in self.rows_container.winfo_children():
-            widget.destroy()
-        self.row_widgets.clear()
+        # Clear previous data and tree entries.
+        for item in self.tree.get_children():
+            self.tree.delete(item)
+        self.data.clear()
         results_list.clear()
-
-        # Reset and start progress bar.
         self.progress.config(value=0)
         self.progress_info.config(text="0/0, Remaining: 0 sec")
 
-        # Run the async processing in a separate thread.
+        # Run recognition in a separate thread.
         thread = threading.Thread(target=self.run_recognition,
                                   args=(directory, ))
         thread.start()
 
     def run_recognition(self, directory):
         asyncio.run(self.process_files(directory))
-        # When done, update the UI from the main thread.
-        self.root.after(0, self.populate_results)
+        self.root.after(0, self.populate_tree)
 
     async def process_files(self, directory):
-        """
-        Traverse the directory for mp3 files (excluding any folder named 'test'),
-        run recognition on each file (with modify=False), and update the progress bar and info.
-        """
         mp3_files = []
         for root_dir, dirs, files in os.walk(directory):
             if "test" in os.path.basename(root_dir).lower():
@@ -176,6 +138,8 @@ class MP3RenamerGUI:
                                                          delay=10,
                                                          nbrRetry=3,
                                                          trace=False)
+                # Add an "apply" flag defaulting to True.
+                result["apply"] = True
                 results_list.append(result)
             except Exception as e:
                 print(f"Error processing {file_name}: {e}")
@@ -191,61 +155,60 @@ class MP3RenamerGUI:
         self.progress_info.config(
             text=f"{count}/{self.total_files}, Remaining: {remaining} sec")
 
-    def populate_results(self):
-        # Populate rows from the global results_list.
+    def populate_tree(self):
+        # Populate the Treeview with data from results_list.
         for result in results_list:
-            self.add_row(result)
-        if not self.row_widgets:
+            # Store each row's data.
+            self.data.append(result)
+            self.tree.insert(
+                "",
+                "end",
+                values=("Yes", os.path.basename(result.get("file_path", "")),
+                        os.path.basename(result.get("new_file_path", ""))))
+        if not self.data:
             messagebox.showinfo("Info", "No MP3 files were processed.")
 
-    def add_row(self, result):
-        row_frame = ttk.Frame(self.rows_container,
-                              relief="groove",
-                              borderwidth=1,
-                              padding=2)
-        row_frame.pack(fill=tk.X, padx=2, pady=2)
-        # Configure grid columns uniformly for this row.
-        row_frame.grid_columnconfigure(0, weight=1, uniform="group")
-        row_frame.grid_columnconfigure(1, weight=3, uniform="group")
-        row_frame.grid_columnconfigure(2, weight=3, uniform="group")
+    def on_tree_click(self, event):
+        # Identify column and row clicked.
+        region = self.tree.identify("region", event.x, event.y)
+        if region != "cell":
+            return
+        column = self.tree.identify_column(event.x)
+        row_id = self.tree.identify_row(event.y)
+        if not row_id:
+            return
 
-        var = tk.BooleanVar(value=True)
-        chk = ttk.Checkbutton(row_frame, variable=var)
-        chk.grid(row=0, column=0, padx=5, sticky="w")
+        # If "Apply" column (first column) is clicked, toggle the flag.
+        if column == "#1":
+            index = self.tree.index(row_id)
+            # Toggle the flag.
+            self.data[index]["apply"] = not self.data[index].get("apply", True)
+            new_value = "Yes" if self.data[index]["apply"] else "No"
+            self.tree.set(row_id, "apply", new_value)
 
-        old_name = os.path.basename(result.get("file_path", ""))
-        new_name = os.path.basename(result.get("new_file_path", ""))
-        lbl_old = ttk.Label(row_frame, text=old_name, width=30)
-        lbl_old.grid(row=0, column=1, padx=5, sticky="w")
-        lbl_new = ttk.Label(row_frame, text=new_name, width=30)
-        lbl_new.grid(row=0, column=2, padx=5, sticky="w")
-
-        self.row_widgets.append((var, result))
-
-    def refresh_rows(self):
-        # Clear current rows.
-        for widget in self.rows_container.winfo_children():
-            widget.destroy()
-        # Rebuild rows in order.
-        for var, result in self.row_widgets:
-            self.add_row(result)
-
-    def sort_by_old_name(self):
-        # Sort rows based on the basename of file_path.
-        self.row_widgets.sort(
-            key=lambda x: os.path.basename(x[1].get("file_path", "")).lower())
-        self.refresh_rows()
-
-    def sort_by_new_name(self):
-        # Sort rows based on the basename of new_file_path.
-        self.row_widgets.sort(key=lambda x: os.path.basename(x[1].get(
-            "new_file_path", "")).lower())
-        self.refresh_rows()
+    def sort_by(self, key):
+        # key is "old" or "new"
+        if key == "old":
+            self.data.sort(
+                key=lambda x: os.path.basename(x.get("file_path", "")).lower())
+        elif key == "new":
+            self.data.sort(key=lambda x: os.path.basename(
+                x.get("new_file_path", "")).lower())
+        # Clear and repopulate tree.
+        for item in self.tree.get_children():
+            self.tree.delete(item)
+        for result in self.data:
+            self.tree.insert(
+                "",
+                "end",
+                values=("Yes" if result.get("apply", True) else "No",
+                        os.path.basename(result.get("file_path", "")),
+                        os.path.basename(result.get("new_file_path", ""))))
 
     def apply_changes(self):
         errors = []
-        for var, result in self.row_widgets:
-            if var.get():
+        for result in self.data:
+            if result.get("apply", True):
                 old_path = result.get("file_path")
                 new_path = result.get("new_file_path")
                 try:
@@ -282,3 +245,7 @@ def launch_gui():
     root = tk.Tk()
     app = MP3RenamerGUI(root)
     root.mainloop()
+
+
+if __name__ == "__main__":
+    launch_gui()
