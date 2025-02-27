@@ -1,0 +1,44 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"build_systems": [
+		{
+			"name": "Mp3ShazamAutoTag Gui",
+			"target": "terminus_exec",
+			"focus": true,
+			"timeit": false,
+			"file_regex": "^(..[^:]*):([0-9]+):?([0-9]+)?:? (.*)$",
+			"cancel": "terminus_cancel_build",
+			"linux": {
+				"shell_cmd": "python3 \"${project_path:${folder}}/main.py\""
+			},
+			"windows": {
+				"shell_cmd": "python \"${project_path:${folder}}/main.py\""
+			},
+			"working_dir": "${project_path:${folder}}",
+		},
+		{
+			"name": "Mp3ShazamAutoTag - Tests",
+			"target": "terminus_exec",
+			"focus": true,
+			"timeit": false,
+			"file_regex": "^(..[^:]*):([0-9]+):?([0-9]+)?:? (.*)$",
+			"cancel": "terminus_cancel_build",
+			"shell_cmd": "pytest",
+			"working_dir": "${project_path:${folder}}",
+		},
+		{
+			"name": "Mp3ShazamAutoTag - Install dependencies",
+			"target": "terminus_exec",
+			"focus": true,
+			"timeit": false,
+			"file_regex": "^(..[^:]*):([0-9]+):?([0-9]+)?:? (.*)$",
+			"cancel": "terminus_cancel_build",
+			"shell_cmd": "pip install .",
+			"working_dir": "${project_path:${folder}}",
+		},
+	]
+}
