@@ -74,28 +74,28 @@ class MP3RenamerGUI:
         # Header row for the table.
         header_frame = ttk.Frame(self.scrollable_frame)
         header_frame.pack(fill=tk.X)
-        ttk.Label(header_frame,
-                  text="Apply",
-                  width=6,
-                  anchor="center",
-                  relief="ridge").grid(row=0, column=0, sticky="nsew")
-        # Make the "Old Name" header clickable.
-        old_name_label = ttk.Label(header_frame,
-                                   text="Old Name",
-                                   width=30,
-                                   anchor="center",
-                                   relief="ridge")
-        old_name_label.grid(row=0, column=1, sticky="nsew")
-        old_name_label.bind("<Button-1>", lambda e: self.sort_by_old_name())
-
-        # Make the "New Name" header clickable.
-        new_name_label = ttk.Label(header_frame,
-                                   text="New Name",
-                                   width=30,
-                                   anchor="center",
-                                   relief="ridge")
-        new_name_label.grid(row=0, column=2, sticky="nsew")
-        new_name_label.bind("<Button-1>", lambda e: self.sort_by_new_name())
+        header_label_apply = ttk.Label(header_frame,
+                                       text="Apply",
+                                       anchor="center",
+                                       relief="ridge")
+        header_label_old = ttk.Label(header_frame,
+                                     text="Old Name",
+                                     anchor="center",
+                                     relief="ridge")
+        header_label_new = ttk.Label(header_frame,
+                                     text="New Name",
+                                     anchor="center",
+                                     relief="ridge")
+        header_label_apply.grid(row=0, column=0, sticky="nsew")
+        header_label_old.grid(row=0, column=1, sticky="nsew")
+        header_label_new.grid(row=0, column=2, sticky="nsew")
+        # Set uniform column widths.
+        header_frame.grid_columnconfigure(0, weight=1, uniform="group")
+        header_frame.grid_columnconfigure(1, weight=3, uniform="group")
+        header_frame.grid_columnconfigure(2, weight=3, uniform="group")
+        # Bind clicks for sorting.
+        header_label_old.bind("<Button-1>", lambda e: self.sort_by_old_name())
+        header_label_new.bind("<Button-1>", lambda e: self.sort_by_new_name())
 
         # Container for file rows.
         self.rows_container = ttk.Frame(self.scrollable_frame)
@@ -204,6 +204,11 @@ class MP3RenamerGUI:
                               borderwidth=1,
                               padding=2)
         row_frame.pack(fill=tk.X, padx=2, pady=2)
+        # Configure grid columns uniformly for this row.
+        row_frame.grid_columnconfigure(0, weight=1, uniform="group")
+        row_frame.grid_columnconfigure(1, weight=3, uniform="group")
+        row_frame.grid_columnconfigure(2, weight=3, uniform="group")
+
         var = tk.BooleanVar(value=True)
         chk = ttk.Checkbutton(row_frame, variable=var)
         chk.grid(row=0, column=0, padx=5, sticky="w")
@@ -223,19 +228,7 @@ class MP3RenamerGUI:
             widget.destroy()
         # Rebuild rows in order.
         for var, result in self.row_widgets:
-            row_frame = ttk.Frame(self.rows_container,
-                                  relief="groove",
-                                  borderwidth=1,
-                                  padding=2)
-            row_frame.pack(fill=tk.X, padx=2, pady=2)
-            chk = ttk.Checkbutton(row_frame, variable=var)
-            chk.grid(row=0, column=0, padx=5, sticky="w")
-            old_name = os.path.basename(result.get("file_path", ""))
-            new_name = os.path.basename(result.get("new_file_path", ""))
-            lbl_old = ttk.Label(row_frame, text=old_name, width=30)
-            lbl_old.grid(row=0, column=1, padx=5, sticky="w")
-            lbl_new = ttk.Label(row_frame, text=new_name, width=30)
-            lbl_new.grid(row=0, column=2, padx=5, sticky="w")
+            self.add_row(result)
 
     def sort_by_old_name(self):
         # Sort rows based on the basename of file_path.
