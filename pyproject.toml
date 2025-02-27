@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mp3ShazamAutoTag"
+version = "0.1.0"
+description = "Use shazam to rename and filled the tag of a list of mp3 files."
+readme = "README.md"
+requires-python = ">=3.6"
+license = { file = "LICENSE" }
+authors = [
+    { name = "David Algis", email = "david.algis@tutamail.com" }
+]
+dependencies = [
+    "mutagen",
+    "shazamio>=0.5.0",
+    "tqdm",
+    "unidecode",
+    "eyed3",
+    "argparse",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=6.0",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/davidAlgis/mp3ShazamAutoTag"
+"Bug Tracker" = "https://github.com/davidAlgis/mp3ShazamAutoTag/issues"
+
+[tool.setuptools]
+py-modules = [
+    "auto_tag",
+    "tests"
+]
