@@ -34,7 +34,7 @@ class MP3RenamerGUI:
         browse_btn.pack(side=tk.LEFT, padx=5)
 
         # Progress bar.
-        self.progress = ttk.Progressbar(root, mode="indeterminate")
+        self.progress = ttk.Progressbar(root, mode="determinate")
         self.progress.pack(fill=tk.X, padx=10, pady=5)
 
         # Middle Frame: Scrollable area for MP3 files.
@@ -92,8 +92,7 @@ class MP3RenamerGUI:
         apply_btn.pack()
 
         # List to store per-row widgets.
-        self.row_widgets = [
-        ]  # Each element: (checkbox_var, old_name, new_name, result_dict)
+        self.row_widgets = []  # Each element: (checkbox_var, result_dict)
 
     def browse_directory(self):
         directory = filedialog.askdirectory()
@@ -109,8 +108,8 @@ class MP3RenamerGUI:
         self.row_widgets.clear()
         results_list.clear()
 
-        # Start progress bar.
-        self.progress.start(10)
+        # Start progress bar in determinate mode.
+        self.progress.config(value=0)
 
         # Run the async processing in a separate thread.
         thread = threading.Thread(target=self.run_recognition,
@@ -125,7 +124,7 @@ class MP3RenamerGUI:
     async def process_files(self, directory):
         """
         Traverse the directory for mp3 files (excluding any folder named 'test'),
-        and run recognition on each file (with modify=False).
+        and run recognition on each file (with modify=False), updating the progress bar as we go.
         """
         mp3_files = []
         # Walk the directory tree.
@@ -138,14 +137,20 @@ class MP3RenamerGUI:
                     full_path = os.path.join(root_dir, file)
                     mp3_files.append((file, full_path))
 
-        if not mp3_files:
+        total_files = len(mp3_files)
+        # If no files found, show info and exit.
+        if total_files == 0:
             self.root.after(
                 0, lambda: messagebox.showinfo(
                     "Info", f"No MP3 files found in {directory}"))
             return
 
+        # Set the progress bar maximum.
+        self.root.after(0, lambda: self.progress.config(maximum=total_files))
+
         shazam = Shazam()
-        # Process files sequentially so we can update the UI after each.
+        count = 0
+        # Process files sequentially so we can update the progress after each.
         for file_name, file_path in mp3_files:
             try:
                 result = await recognize_and_rename_song(file_path,
@@ -158,11 +163,11 @@ class MP3RenamerGUI:
                 results_list.append(result)
             except Exception as e:
                 print(f"Error processing {file_name}: {e}")
+            count += 1
+            # Update progress bar value in the main thread.
+            self.root.after(0, lambda c=count: self.progress.config(value=c))
 
     def populate_results(self):
-        # Stop the progress bar.
-        self.progress.stop()
-
         # For each result, add a row with a checkbox, old name and new name.
         for result in results_list:
             row_frame = ttk.Frame(self.rows_container,
