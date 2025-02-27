@@ -80,13 +80,21 @@ class MP3RenamerGUI:
         # Bind click event to toggle the "Apply" flag.
         self.tree.bind("<Button-1>", self.on_tree_click)
 
-        # Bottom Frame: Apply button.
+        # Bottom Frame: Apply and Check/Uncheck buttons.
         bottom_frame = ttk.Frame(root, padding="10")
         bottom_frame.pack(side=tk.BOTTOM, fill=tk.X)
         apply_btn = ttk.Button(bottom_frame,
                                text="Apply",
                                command=self.apply_changes)
-        apply_btn.pack()
+        apply_btn.pack(side=tk.RIGHT, padx=(5, 0))
+        uncheck_all_btn = ttk.Button(bottom_frame,
+                                     text="Uncheck All",
+                                     command=self.uncheck_all)
+        uncheck_all_btn.pack(side=tk.RIGHT, padx=5)
+        check_all_btn = ttk.Button(bottom_frame,
+                                   text="Check All",
+                                   command=self.check_all)
+        check_all_btn.pack(side=tk.RIGHT, padx=5)
 
         self.start_time = None  # To track when processing started.
         self.total_files = 0
@@ -208,6 +216,20 @@ class MP3RenamerGUI:
                 values=("Yes" if result.get("apply", True) else "No",
                         os.path.basename(result.get("file_path", "")),
                         os.path.basename(result.get("new_file_path", ""))))
+
+    def check_all(self):
+        # Set the "apply" flag to True for all rows.
+        for idx, result in enumerate(self.data):
+            result["apply"] = True
+            item_id = self.tree.get_children()[idx]
+            self.tree.set(item_id, "apply", "Yes")
+
+    def uncheck_all(self):
+        # Set the "apply" flag to False for all rows.
+        for idx, result in enumerate(self.data):
+            result["apply"] = False
+            item_id = self.tree.get_children()[idx]
+            self.tree.set(item_id, "apply", "No")
 
     def apply_changes(self):
         errors = []
