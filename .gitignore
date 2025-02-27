@@ -1,4 +1,6 @@
 venv/
 .venv
-
+.pytest_cache
 __pycache__
+
+*.sublime-workspace
