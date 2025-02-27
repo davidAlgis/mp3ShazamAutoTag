@@ -2,7 +2,7 @@
 
 This Python project automatically recognizes MP3 files using Shazam, renames them according to the recognized song title and artist, and updates their MP3 tags and cover art. In addition to the command‑line interface, a user‑friendly GUI is now available. You can download a zip file containing the executable from the following address: [https://github.com/davidAlgis/mp3ShazamAutoTag/releases](https://github.com/davidAlgis/mp3ShazamAutoTag/releases).
 
-> ![Example UI](example-ui.jpeg)
+![](example-ui.jpg)
 
 ## Usage
 
