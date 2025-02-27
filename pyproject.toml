@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
+requires = ["setuptools>=61.0", "wheel",  "cx_Freeze"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -15,16 +15,14 @@ authors = [
 dependencies = [
     "mutagen",
     "shazamio>=0.5.0",
-    "tqdm",
     "unidecode",
-    "eyed3",
-    "argparse",
+    "eyed3"
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=6.0",
-    "pytest-asyncio",
+    "pytest-asyncio"
 ]
 
 [project.urls]
