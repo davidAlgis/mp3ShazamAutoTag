@@ -1,6 +1,7 @@
 import os
 import asyncio
 import threading
+import time
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 from auto_tag.mp3_recognize import (recognize_and_rename_song, update_mp3_tags,
@@ -33,9 +34,18 @@ class MP3RenamerGUI:
                                 command=self.browse_directory)
         browse_btn.pack(side=tk.LEFT, padx=5)
 
+        # Progress bar frame to include both the bar and the info label.
+        progress_frame = ttk.Frame(root, padding="10")
+        progress_frame.pack(fill=tk.X)
+
         # Progress bar.
-        self.progress = ttk.Progressbar(root, mode="determinate")
-        self.progress.pack(fill=tk.X, padx=10, pady=5)
+        self.progress = ttk.Progressbar(progress_frame, mode="determinate")
+        self.progress.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 10))
+
+        # Progress info label.
+        self.progress_info = ttk.Label(progress_frame,
+                                       text="0/0, Remaining: 0 sec")
+        self.progress_info.pack(side=tk.LEFT)
 
         # Middle Frame: Scrollable area for MP3 files.
         mid_frame = ttk.Frame(root, padding="10")
@@ -93,6 +103,8 @@ class MP3RenamerGUI:
 
         # List to store per-row widgets.
         self.row_widgets = []  # Each element: (checkbox_var, result_dict)
+        self.start_time = None  # To track when processing started.
+        self.total_files = 0
 
     def browse_directory(self):
         directory = filedialog.askdirectory()
@@ -108,8 +120,9 @@ class MP3RenamerGUI:
         self.row_widgets.clear()
         results_list.clear()
 
-        # Start progress bar in determinate mode.
+        # Reset and start progress bar.
         self.progress.config(value=0)
+        self.progress_info.config(text="0/0, Remaining: 0 sec")
 
         # Run the async processing in a separate thread.
         thread = threading.Thread(target=self.run_recognition,
@@ -124,7 +137,7 @@ class MP3RenamerGUI:
     async def process_files(self, directory):
         """
         Traverse the directory for mp3 files (excluding any folder named 'test'),
-        and run recognition on each file (with modify=False), updating the progress bar as we go.
+        run recognition on each file (with modify=False), and update the progress bar and info.
         """
         mp3_files = []
         # Walk the directory tree.
@@ -137,16 +150,20 @@ class MP3RenamerGUI:
                     full_path = os.path.join(root_dir, file)
                     mp3_files.append((file, full_path))
 
-        total_files = len(mp3_files)
+        self.total_files = len(mp3_files)
         # If no files found, show info and exit.
-        if total_files == 0:
+        if self.total_files == 0:
             self.root.after(
                 0, lambda: messagebox.showinfo(
                     "Info", f"No MP3 files found in {directory}"))
             return
 
         # Set the progress bar maximum.
-        self.root.after(0, lambda: self.progress.config(maximum=total_files))
+        self.root.after(0,
+                        lambda: self.progress.config(maximum=self.total_files))
+
+        # Record the start time.
+        self.start_time = time.time()
 
         shazam = Shazam()
         count = 0
@@ -164,8 +181,18 @@ class MP3RenamerGUI:
             except Exception as e:
                 print(f"Error processing {file_name}: {e}")
             count += 1
-            # Update progress bar value in the main thread.
-            self.root.after(0, lambda c=count: self.progress.config(value=c))
+            # Calculate elapsed and estimated remaining time.
+            elapsed = time.time() - self.start_time
+            avg_time = elapsed / count if count else 0
+            remaining = int(avg_time * (self.total_files - count))
+            # Update progress bar and label in the main thread.
+            self.root.after(
+                0, lambda c=count, r=remaining: self.update_progress(c, r))
+
+    def update_progress(self, count, remaining):
+        self.progress.config(value=count)
+        self.progress_info.config(
+            text=f"{count}/{self.total_files}, Remaining: {remaining} sec")
 
     def populate_results(self):
         # For each result, add a row with a checkbox, old name and new name.
