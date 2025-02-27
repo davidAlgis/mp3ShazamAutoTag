@@ -43,12 +43,21 @@ class MP3RenamerGUI:
                                        text="0/0, Remaining: 0 sec")
         self.progress_info.pack(side=tk.LEFT)
 
+        # Set up a custom style for the Treeview to add padding and increase row height.
+        style = ttk.Style()
+        style.configure(
+            "Custom.Treeview",
+            rowheight=30,  # Increase row height
+            padding=5)  # Add padding inside each cell
+        style.configure("Custom.Treeview.Heading", padding=5)
+
         # Middle Frame: Treeview for displaying MP3 file info.
         tree_frame = ttk.Frame(root, padding="10")
         tree_frame.pack(fill=tk.BOTH, expand=True)
         self.tree = ttk.Treeview(tree_frame,
                                  columns=("apply", "old", "new"),
-                                 show="headings")
+                                 show="headings",
+                                 style="Custom.Treeview")
         self.tree.heading("apply", text="Apply")
         self.tree.heading("old",
                           text="Old Name",
@@ -158,7 +167,6 @@ class MP3RenamerGUI:
     def populate_tree(self):
         # Populate the Treeview with data from results_list.
         for result in results_list:
-            # Store each row's data.
             self.data.append(result)
             self.tree.insert(
                 "",
@@ -169,7 +177,6 @@ class MP3RenamerGUI:
             messagebox.showinfo("Info", "No MP3 files were processed.")
 
     def on_tree_click(self, event):
-        # Identify column and row clicked.
         region = self.tree.identify("region", event.x, event.y)
         if region != "cell":
             return
@@ -181,20 +188,17 @@ class MP3RenamerGUI:
         # If "Apply" column (first column) is clicked, toggle the flag.
         if column == "#1":
             index = self.tree.index(row_id)
-            # Toggle the flag.
             self.data[index]["apply"] = not self.data[index].get("apply", True)
             new_value = "Yes" if self.data[index]["apply"] else "No"
             self.tree.set(row_id, "apply", new_value)
 
     def sort_by(self, key):
-        # key is "old" or "new"
         if key == "old":
             self.data.sort(
                 key=lambda x: os.path.basename(x.get("file_path", "")).lower())
         elif key == "new":
             self.data.sort(key=lambda x: os.path.basename(
                 x.get("new_file_path", "")).lower())
-        # Clear and repopulate tree.
         for item in self.tree.get_children():
             self.tree.delete(item)
         for result in self.data:
