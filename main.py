@@ -2,6 +2,7 @@ import os
 import argparse
 import asyncio
 from auto_tag.mp3_recognize import find_and_recognize_mp3_files
+from auto_tag.gui import launch_gui
 
 
 def str2bool(v):
@@ -64,15 +65,23 @@ async def main():
         help=
         "Enable tracing to print messages during the recognition and renaming process.",
     )
+    parser.add_argument("-g",
+                        "--gui",
+                        type=str2bool,
+                        default=True,
+                        help="Launch the GUI for the application.")
 
     args = parser.parse_args()
 
-    # Handle the directory argument
-    folder_path = (args.directory if args.directory else os.path.dirname(
-        os.path.realpath(__file__)))
+    if args.gui:
+        launch_gui()
+    else:
+        folder_path = (args.directory if args.directory else os.path.dirname(
+            os.path.realpath(__file__)))
 
-    await find_and_recognize_mp3_files(args.directory, args.modify, args.delay,
-                                       args.nbrRetry, args.trace)
+        await find_and_recognize_mp3_files(args.directory, args.modify,
+                                           args.delay, args.nbrRetry,
+                                           args.trace)
 
 
 if __name__ == "__main__":
