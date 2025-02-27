@@ -18,6 +18,7 @@ class MP3RenamerGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("MP3 Auto-Title & Tagger")
+        self.row_widgets = []  # Each element: (checkbox_var, result_dict)
 
         # Top Frame: Directory input and browse button.
         top_frame = ttk.Frame(root, padding="10")
@@ -78,16 +79,23 @@ class MP3RenamerGUI:
                   width=6,
                   anchor="center",
                   relief="ridge").grid(row=0, column=0, sticky="nsew")
-        ttk.Label(header_frame,
-                  text="Old Name",
-                  width=30,
-                  anchor="center",
-                  relief="ridge").grid(row=0, column=1, sticky="nsew")
-        ttk.Label(header_frame,
-                  text="New Name",
-                  width=30,
-                  anchor="center",
-                  relief="ridge").grid(row=0, column=2, sticky="nsew")
+        # Make the "Old Name" header clickable.
+        old_name_label = ttk.Label(header_frame,
+                                   text="Old Name",
+                                   width=30,
+                                   anchor="center",
+                                   relief="ridge")
+        old_name_label.grid(row=0, column=1, sticky="nsew")
+        old_name_label.bind("<Button-1>", lambda e: self.sort_by_old_name())
+
+        # Make the "New Name" header clickable.
+        new_name_label = ttk.Label(header_frame,
+                                   text="New Name",
+                                   width=30,
+                                   anchor="center",
+                                   relief="ridge")
+        new_name_label.grid(row=0, column=2, sticky="nsew")
+        new_name_label.bind("<Button-1>", lambda e: self.sort_by_new_name())
 
         # Container for file rows.
         self.rows_container = ttk.Frame(self.scrollable_frame)
@@ -101,8 +109,6 @@ class MP3RenamerGUI:
                                command=self.apply_changes)
         apply_btn.pack()
 
-        # List to store per-row widgets.
-        self.row_widgets = []  # Each element: (checkbox_var, result_dict)
         self.start_time = None  # To track when processing started.
         self.total_files = 0
 
@@ -140,9 +146,7 @@ class MP3RenamerGUI:
         run recognition on each file (with modify=False), and update the progress bar and info.
         """
         mp3_files = []
-        # Walk the directory tree.
         for root_dir, dirs, files in os.walk(directory):
-            # Skip directories named 'test' (case-insensitive).
             if "test" in os.path.basename(root_dir).lower():
                 continue
             for file in files:
@@ -151,23 +155,18 @@ class MP3RenamerGUI:
                     mp3_files.append((file, full_path))
 
         self.total_files = len(mp3_files)
-        # If no files found, show info and exit.
         if self.total_files == 0:
             self.root.after(
                 0, lambda: messagebox.showinfo(
                     "Info", f"No MP3 files found in {directory}"))
             return
 
-        # Set the progress bar maximum.
         self.root.after(0,
                         lambda: self.progress.config(maximum=self.total_files))
-
-        # Record the start time.
         self.start_time = time.time()
 
         shazam = Shazam()
         count = 0
-        # Process files sequentially so we can update the progress after each.
         for file_name, file_path in mp3_files:
             try:
                 result = await recognize_and_rename_song(file_path,
@@ -181,11 +180,9 @@ class MP3RenamerGUI:
             except Exception as e:
                 print(f"Error processing {file_name}: {e}")
             count += 1
-            # Calculate elapsed and estimated remaining time.
             elapsed = time.time() - self.start_time
             avg_time = elapsed / count if count else 0
             remaining = int(avg_time * (self.total_files - count))
-            # Update progress bar and label in the main thread.
             self.root.after(
                 0, lambda c=count, r=remaining: self.update_progress(c, r))
 
@@ -195,18 +192,44 @@ class MP3RenamerGUI:
             text=f"{count}/{self.total_files}, Remaining: {remaining} sec")
 
     def populate_results(self):
-        # For each result, add a row with a checkbox, old name and new name.
+        # Populate rows from the global results_list.
         for result in results_list:
+            self.add_row(result)
+        if not self.row_widgets:
+            messagebox.showinfo("Info", "No MP3 files were processed.")
+
+    def add_row(self, result):
+        row_frame = ttk.Frame(self.rows_container,
+                              relief="groove",
+                              borderwidth=1,
+                              padding=2)
+        row_frame.pack(fill=tk.X, padx=2, pady=2)
+        var = tk.BooleanVar(value=True)
+        chk = ttk.Checkbutton(row_frame, variable=var)
+        chk.grid(row=0, column=0, padx=5, sticky="w")
+
+        old_name = os.path.basename(result.get("file_path", ""))
+        new_name = os.path.basename(result.get("new_file_path", ""))
+        lbl_old = ttk.Label(row_frame, text=old_name, width=30)
+        lbl_old.grid(row=0, column=1, padx=5, sticky="w")
+        lbl_new = ttk.Label(row_frame, text=new_name, width=30)
+        lbl_new.grid(row=0, column=2, padx=5, sticky="w")
+
+        self.row_widgets.append((var, result))
+
+    def refresh_rows(self):
+        # Clear current rows.
+        for widget in self.rows_container.winfo_children():
+            widget.destroy()
+        # Rebuild rows in order.
+        for var, result in self.row_widgets:
             row_frame = ttk.Frame(self.rows_container,
                                   relief="groove",
                                   borderwidth=1,
                                   padding=2)
             row_frame.pack(fill=tk.X, padx=2, pady=2)
-
-            var = tk.BooleanVar(value=True)
             chk = ttk.Checkbutton(row_frame, variable=var)
             chk.grid(row=0, column=0, padx=5, sticky="w")
-
             old_name = os.path.basename(result.get("file_path", ""))
             new_name = os.path.basename(result.get("new_file_path", ""))
             lbl_old = ttk.Label(row_frame, text=old_name, width=30)
@@ -214,44 +237,38 @@ class MP3RenamerGUI:
             lbl_new = ttk.Label(row_frame, text=new_name, width=30)
             lbl_new.grid(row=0, column=2, padx=5, sticky="w")
 
-            self.row_widgets.append((var, result))
-        if not self.row_widgets:
-            messagebox.showinfo("Info", "No MP3 files were processed.")
+    def sort_by_old_name(self):
+        # Sort rows based on the basename of file_path.
+        self.row_widgets.sort(
+            key=lambda x: os.path.basename(x[1].get("file_path", "")).lower())
+        self.refresh_rows()
+
+    def sort_by_new_name(self):
+        # Sort rows based on the basename of new_file_path.
+        self.row_widgets.sort(key=lambda x: os.path.basename(x[1].get(
+            "new_file_path", "")).lower())
+        self.refresh_rows()
 
     def apply_changes(self):
-        # For each row that is checked, apply the renaming and update tags and cover art.
         errors = []
         for var, result in self.row_widgets:
             if var.get():
                 old_path = result.get("file_path")
                 new_path = result.get("new_file_path")
                 try:
-                    # Skip if the original file doesn't exist.
                     if not os.path.exists(old_path):
                         continue
-
-                    # If a file with new_path already exists, append a counter to make it unique.
                     base, ext = os.path.splitext(new_path)
                     counter = 1
                     unique_new_path = new_path
                     while os.path.exists(unique_new_path):
                         unique_new_path = f"{base} ({counter}){ext}"
                         counter += 1
-
-                    # Rename file using the unique new path.
                     os.rename(old_path, unique_new_path)
-
-                    # Parse new file name to extract album:
-                    # Expected format: "Title - Artist - Album.mp3"
                     base_name = os.path.splitext(
                         os.path.basename(unique_new_path))[0]
                     parts = base_name.split(" - ")
-                    if len(parts) >= 3:
-                        album = parts[2]
-                    else:
-                        album = "Unknown Album"
-
-                    # Update tags and cover art.
+                    album = parts[2] if len(parts) >= 3 else "Unknown Album"
                     update_mp3_tags(unique_new_path,
                                     result.get("title", "Unknown Title"),
                                     result.get("author", "Unknown Artist"),
