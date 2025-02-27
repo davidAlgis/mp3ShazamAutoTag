@@ -77,8 +77,10 @@ class MP3RenamerGUI:
         self.tree.configure(yscrollcommand=scrollbar.set)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
-        # Bind click event to toggle the "Apply" flag.
+        # Bind mouse click event to toggle the "Apply" flag.
         self.tree.bind("<Button-1>", self.on_tree_click)
+        # Bind the Return (Enter) key to toggle the "Apply" flag on the focused row.
+        self.tree.bind("<Return>", self.on_enter)
 
         # Bottom Frame: Apply and Check/Uncheck buttons.
         bottom_frame = ttk.Frame(root, padding="10")
@@ -113,7 +115,6 @@ class MP3RenamerGUI:
         results_list.clear()
         self.progress.config(value=0)
         self.progress_info.config(text="0/0, Remaining: 0 sec")
-
         # Run recognition in a separate thread.
         thread = threading.Thread(target=self.run_recognition,
                                   args=(directory, ))
@@ -132,18 +133,15 @@ class MP3RenamerGUI:
                 if file.lower().endswith(".mp3"):
                     full_path = os.path.join(root_dir, file)
                     mp3_files.append((file, full_path))
-
         self.total_files = len(mp3_files)
         if self.total_files == 0:
             self.root.after(
                 0, lambda: messagebox.showinfo(
                     "Info", f"No MP3 files found in {directory}"))
             return
-
         self.root.after(0,
                         lambda: self.progress.config(maximum=self.total_files))
         self.start_time = time.time()
-
         shazam = Shazam()
         count = 0
         for file_name, file_path in mp3_files:
@@ -155,7 +153,6 @@ class MP3RenamerGUI:
                                                          delay=10,
                                                          nbrRetry=3,
                                                          trace=False)
-                # Add an "apply" flag defaulting to True.
                 result["apply"] = True
                 results_list.append(result)
             except Exception as e:
@@ -173,7 +170,6 @@ class MP3RenamerGUI:
             text=f"{count}/{self.total_files}, Remaining: {remaining} sec")
 
     def populate_tree(self):
-        # Populate the Treeview with data from results_list.
         for result in results_list:
             self.data.append(result)
             self.tree.insert(
@@ -192,13 +188,22 @@ class MP3RenamerGUI:
         row_id = self.tree.identify_row(event.y)
         if not row_id:
             return
-
         # If "Apply" column (first column) is clicked, toggle the flag.
         if column == "#1":
             index = self.tree.index(row_id)
             self.data[index]["apply"] = not self.data[index].get("apply", True)
             new_value = "Yes" if self.data[index]["apply"] else "No"
             self.tree.set(row_id, "apply", new_value)
+
+    def on_enter(self, event):
+        # When Enter is pressed, toggle the "Apply" flag for the currently focused row.
+        row_id = self.tree.focus()
+        if not row_id:
+            return
+        index = self.tree.index(row_id)
+        self.data[index]["apply"] = not self.data[index].get("apply", True)
+        new_value = "Yes" if self.data[index]["apply"] else "No"
+        self.tree.set(row_id, "apply", new_value)
 
     def sort_by(self, key):
         if key == "old":
@@ -218,14 +223,12 @@ class MP3RenamerGUI:
                         os.path.basename(result.get("new_file_path", ""))))
 
     def check_all(self):
-        # Set the "apply" flag to True for all rows.
         for idx, result in enumerate(self.data):
             result["apply"] = True
             item_id = self.tree.get_children()[idx]
             self.tree.set(item_id, "apply", "Yes")
 
     def uncheck_all(self):
-        # Set the "apply" flag to False for all rows.
         for idx, result in enumerate(self.data):
             result["apply"] = False
             item_id = self.tree.get_children()[idx]
@@ -260,7 +263,6 @@ class MP3RenamerGUI:
                                          trace=False)
                 except Exception as e:
                     errors.append(f"Error processing {old_path}: {e}")
-
         if errors:
             messagebox.showerror("Errors Occurred", "\n".join(errors))
         else:
