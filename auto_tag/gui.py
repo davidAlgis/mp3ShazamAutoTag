@@ -24,7 +24,8 @@ def get_base_directory():
         # PyInstaller sets sys._MEIPASS to the temp folder containing bundled files.
         return sys._MEIPASS
     else:
-        return os.path.abspath(os.path.dirname(__file__))
+        current_directory = os.path.abspath(os.path.dirname(__file__))
+        return os.path.abspath(os.path.join(current_directory, os.pardir))
 
 
 class MP3RenamerGUI:
