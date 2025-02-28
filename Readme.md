@@ -1,6 +1,9 @@
 # MP3 File Recognizer and Renamer
 
-This Python project automatically recognizes MP3 files using Shazam, renames them according to the recognized song title and artist, and updates their MP3 tags and cover art. In addition to the command‑line interface, a user‑friendly GUI is now available. You can download a zip file containing the executable from the following address: [https://github.com/davidAlgis/mp3ShazamAutoTag/releases](https://github.com/davidAlgis/mp3ShazamAutoTag/releases).
+This Python project automatically recognizes MP3 files using Shazam, renames them according to the recognized song title and artist, and updates their MP3 tags and cover art. In addition to the command‑line interface, a user‑friendly GUI is now available. You can download the executable file at the following address: [https://github.com/davidAlgis/mp3ShazamAutoTag/releases](https://github.com/davidAlgis/mp3ShazamAutoTag/releases).
+
+> [!WARNING]  
+> Your antivirus can quarantine the software, but as the source code of this repository it is completely harmless. Moreover, the first launch of the executable might be a bit long. 
 
 ![](example-ui.jpg)
 
@@ -64,20 +67,18 @@ python main.py [options]
 
 ## Building the Executable
 
-This project now includes a `setup.py` to build a standalone executable using **cx_Freeze**. To build the executable:
+This project can be built as a standalone executable using `pyinstaller`. To build the executable:
 
-1. Install cx_Freeze if not already installed:
+1. Install `pyinstaller` if not already installed:
 
    ```bash
-   pip install cx_Freeze
+   pip install pyinstaller
    ```
 
 2. Run the build command:
 
    ```bash
-   python setup.py build
+   
    ```
 
 This will create a **build** folder with the executable and required files.
-
-Enjoy using the MP3 File Recognizer and Renamer!
