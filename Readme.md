@@ -69,16 +69,24 @@ python main.py [options]
 
 This project can be built as a standalone executable using `pyinstaller`. To build the executable:
 
-1. Install `pyinstaller` if not already installed:
+
+1. Move to a dedicated environment, the command (on windows) is:
+   ```bash
+   python -m venv venv
+   venv\Scripts\activate
+   ```
+
+1. Install the required packages:
 
    ```bash
+   pip install .
    pip install pyinstaller
    ```
 
 2. Run the build command:
 
    ```bash
-   
+   pyinstaller --onefile --noconsole --icon="[full_path_to]\assets\auto_tag.ico" --add-data="[full_path_to]\assets\auto_tag.ico;assets" --workpath=build --distpath=build --specpath=build main.py
    ```
 
-This will create a **build** folder with the executable and required files.
+This will create a **build** folder with the executable and some temporary files.
