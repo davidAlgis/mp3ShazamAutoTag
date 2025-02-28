@@ -83,6 +83,10 @@ class MP3RenamerGUI:
         self.tree.column("new", width=300, anchor="w")
         self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
+        # Configure tags for color coding
+        self.tree.tag_configure("Yes", foreground="#5a7849")  # Green color
+        self.tree.tag_configure("No", foreground="#DB504A")  # Red color
+
         # Allow user to adjust column widths by adding a scrollbar.
         scrollbar = ttk.Scrollbar(tree_frame,
                                   orient="vertical",
@@ -198,7 +202,8 @@ class MP3RenamerGUI:
                 "end",
                 values=(apply_value,
                         os.path.basename(result.get("file_path", "")),
-                        os.path.basename(result.get("new_file_path", ""))))
+                        os.path.basename(result.get("new_file_path", ""))),
+                tags=(apply_value, ))
         if not self.data:
             messagebox.showinfo("Info", "No MP3 files were processed.")
 
@@ -216,6 +221,7 @@ class MP3RenamerGUI:
             self.data[index]["apply"] = not self.data[index].get("apply", True)
             new_value = "Yes" if self.data[index]["apply"] else "No"
             self.tree.set(row_id, "apply", new_value)
+            self.tree.item(row_id, tags=(new_value, ))
 
     def on_enter(self, event):
         # Toggle the "Apply" flag for the focused row when Enter is pressed.
@@ -226,6 +232,7 @@ class MP3RenamerGUI:
         self.data[index]["apply"] = not self.data[index].get("apply", True)
         new_value = "Yes" if self.data[index]["apply"] else "No"
         self.tree.set(row_id, "apply", new_value)
+        self.tree.item(row_id, tags=(new_value, ))
 
     def on_double_click(self, event):
         # Determine which cell was double-clicked.
@@ -287,19 +294,22 @@ class MP3RenamerGUI:
                 "end",
                 values=(apply_value,
                         os.path.basename(result.get("file_path", "")),
-                        os.path.basename(result.get("new_file_path", ""))))
+                        os.path.basename(result.get("new_file_path", ""))),
+                tags=(apply_value, ))
 
     def check_all(self):
         for idx, result in enumerate(self.data):
             result["apply"] = True
             item_id = self.tree.get_children()[idx]
             self.tree.set(item_id, "apply", "Yes")
+            self.tree.item(item_id, tags=("Yes", ))
 
     def uncheck_all(self):
         for idx, result in enumerate(self.data):
             result["apply"] = False
             item_id = self.tree.get_children()[idx]
             self.tree.set(item_id, "apply", "No")
+            self.tree.item(item_id, tags=("No", ))
 
     def apply_changes(self):
         errors = []
