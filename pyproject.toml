@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel",  "cx_Freeze"]
+requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -16,7 +16,8 @@ dependencies = [
     "mutagen",
     "shazamio>=0.5.0",
     "unidecode",
-    "eyed3"
+    "eyed3",
+    "tqdm"
 ]
 
 [project.optional-dependencies]
@@ -26,7 +27,7 @@ dev = [
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/davidAlgis/mp3ShazamAutoTag"
+Homepage = "https://github.com/davidAlgis/mp3ShazamAutoTag"
 "Bug Tracker" = "https://github.com/davidAlgis/mp3ShazamAutoTag/issues"
 
 [tool.setuptools]
@@ -34,3 +35,6 @@ py-modules = [
     "auto_tag",
     "tests"
 ]
+
+[tool.setuptools.package-data]
+"auto_tag" = ["assets/*.ico"]
