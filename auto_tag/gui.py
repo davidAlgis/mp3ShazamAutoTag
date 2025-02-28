@@ -167,7 +167,13 @@ class MP3RenamerGUI:
                                                          delay=10,
                                                          nbrRetry=3,
                                                          trace=False)
-                result["apply"] = True
+                # Set apply to False if no title, artist, or album is found
+                if result.get("title") == "Unknown Title" or result.get(
+                        "author") == "Unknown Artist" or result.get(
+                            "album") == "Unknown Album":
+                    result["apply"] = False
+                else:
+                    result["apply"] = True
                 results_list.append(result)
             except Exception as e:
                 print(f"Error processing {file_name}: {e}")
@@ -186,10 +192,12 @@ class MP3RenamerGUI:
     def populate_tree(self):
         for result in results_list:
             self.data.append(result)
+            apply_value = "Yes" if result.get("apply", False) else "No"
             self.tree.insert(
                 "",
                 "end",
-                values=("Yes", os.path.basename(result.get("file_path", "")),
+                values=(apply_value,
+                        os.path.basename(result.get("file_path", "")),
                         os.path.basename(result.get("new_file_path", ""))))
         if not self.data:
             messagebox.showinfo("Info", "No MP3 files were processed.")
@@ -273,10 +281,11 @@ class MP3RenamerGUI:
         for item in self.tree.get_children():
             self.tree.delete(item)
         for result in self.data:
+            apply_value = "Yes" if result.get("apply", False) else "No"
             self.tree.insert(
                 "",
                 "end",
-                values=("Yes" if result.get("apply", True) else "No",
+                values=(apply_value,
                         os.path.basename(result.get("file_path", "")),
                         os.path.basename(result.get("new_file_path", ""))))
 
