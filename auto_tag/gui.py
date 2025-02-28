@@ -16,17 +16,15 @@ results_list = []
 
 def get_base_directory():
     """
-    Determines the base directory for the application, depending on whether it's run
-    as a standalone executable (frozen) or as a normal Python script.
-    
-    - When frozen (PyInstaller or cx_Freeze), sys.executable is used.
-    - Otherwise, it returns the parent directory of the current file.
+    Determines the base directory for the application.
+    - When frozen by PyInstaller, sys._MEIPASS is used.
+    - Otherwise, the directory of the current file is used.
     """
     if getattr(sys, 'frozen', False):
-        return os.path.dirname(sys.executable)
+        # PyInstaller sets sys._MEIPASS to the temp folder containing bundled files.
+        return sys._MEIPASS
     else:
-        current_directory = os.path.abspath(os.path.dirname(__file__))
-        return os.path.abspath(os.path.join(current_directory, os.pardir))
+        return os.path.abspath(os.path.dirname(__file__))
 
 
 class MP3RenamerGUI:
@@ -62,10 +60,7 @@ class MP3RenamerGUI:
 
         # Set up a custom style for the Treeview to add padding and increase row height.
         style = ttk.Style()
-        style.configure(
-            "Custom.Treeview",
-            rowheight=30,  # Increase row height
-            padding=5)  # Add padding inside each cell
+        style.configure("Custom.Treeview", rowheight=30, padding=5)
         style.configure("Custom.Treeview.Heading", padding=5)
 
         # Middle Frame: Treeview for displaying MP3 file info.
