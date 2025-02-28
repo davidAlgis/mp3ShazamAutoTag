@@ -240,25 +240,31 @@ class MP3RenamerGUI:
         if region != "cell":
             return
         column = self.tree.identify_column(event.x)
-        # We only allow editing on the "New Name" column (third column, i.e. "#3").
-        if column != "#3":
-            return
         row_id = self.tree.identify_row(event.y)
         if not row_id:
             return
-        x, y, width, height = self.tree.bbox(row_id, column)
-        # Get the current text.
-        current_text = self.tree.set(row_id, "new")
-        # Create an Entry widget over the cell.
-        self.editing_entry = tk.Entry(self.tree)
-        self.editing_entry.place(x=x, y=y, width=width, height=height)
-        self.editing_entry.insert(0, current_text)
-        self.editing_entry.focus()
-        # Bind Return key and focus out to finish editing.
-        self.editing_entry.bind("<Return>",
-                                lambda e: self.finish_editing(row_id))
-        self.editing_entry.bind("<FocusOut>",
-                                lambda e: self.finish_editing(row_id))
+        # If the first or second column is double-clicked, toggle the "Apply" flag.
+        if column in ("#1", "#2"):
+            index = self.tree.index(row_id)
+            self.data[index]["apply"] = not self.data[index].get("apply", True)
+            new_value = "Yes" if self.data[index]["apply"] else "No"
+            self.tree.set(row_id, "apply", new_value)
+            self.tree.item(row_id, tags=(new_value, ))
+        # If the third column is double-clicked, allow editing of the new file name.
+        elif column == "#3":
+            x, y, width, height = self.tree.bbox(row_id, column)
+            # Get the current text.
+            current_text = self.tree.set(row_id, "new")
+            # Create an Entry widget over the cell.
+            self.editing_entry = tk.Entry(self.tree)
+            self.editing_entry.place(x=x, y=y, width=width, height=height)
+            self.editing_entry.insert(0, current_text)
+            self.editing_entry.focus()
+            # Bind Return key and focus out to finish editing.
+            self.editing_entry.bind("<Return>",
+                                    lambda e: self.finish_editing(row_id))
+            self.editing_entry.bind("<FocusOut>",
+                                    lambda e: self.finish_editing(row_id))
 
     def finish_editing(self, row_id):
         if self.editing_entry:
