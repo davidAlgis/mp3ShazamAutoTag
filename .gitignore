@@ -2,5 +2,7 @@ venv/
 .venv
 .pytest_cache
 __pycache__
-
+build/
+mp3ShazamAutoTag.egg-info/
+dist/
 *.sublime-workspace
