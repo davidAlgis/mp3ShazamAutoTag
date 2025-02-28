@@ -1,4 +1,5 @@
 import os
+import sys
 import asyncio
 import threading
 import time
@@ -13,11 +14,26 @@ from shazamio import Shazam
 results_list = []
 
 
+def get_base_directory():
+    """
+    Determines the base directory for the application, depending on whether it's run
+    as a standalone executable (frozen) or as a normal Python script.
+    
+    - When frozen (PyInstaller or cx_Freeze), sys.executable is used.
+    - Otherwise, it returns the parent directory of the current file.
+    """
+    if getattr(sys, 'frozen', False):
+        return os.path.dirname(sys.executable)
+    else:
+        current_directory = os.path.abspath(os.path.dirname(__file__))
+        return os.path.abspath(os.path.join(current_directory, os.pardir))
+
+
 class MP3RenamerGUI:
 
     def __init__(self, root):
         self.root = root
-        self.root.title("MP3 Auto-Title & Tagger")
+        self.root.title("MP3 Shazam Auto Tag")
         self.data = []  # List of dicts with result info and an "apply" flag.
         self.editing_entry = None  # Reference to the current editing Entry widget.
 
@@ -317,6 +333,13 @@ class MP3RenamerGUI:
 
 def launch_gui():
     root = tk.Tk()
+    # Use get_base_directory to determine the path for the icon
+    base_dir = get_base_directory()
+    icon_path = os.path.join(base_dir, "assets", "auto_tag.ico")
+    try:
+        root.iconbitmap(icon_path)
+    except Exception as e:
+        print("Warning: Unable to load icon.", e)
     app = MP3RenamerGUI(root)
     root.mainloop()
 
