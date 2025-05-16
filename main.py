@@ -66,8 +66,8 @@ async def main():
         type=str2bool,
         nargs="?",
         const=True,
-        default=False,
-        help="Launch the GUI (default: false)",
+        default=True,
+        help="Launch the GUI (default: true)",
     )
     parser.add_argument(
         "-e",
