@@ -1,20 +1,18 @@
 # auto_tag/audio_recognize.py
 """
-Recognise audio files with Shazam, (optionally) rename them,
+Recognise audio files with Shazam, optionally rename them,
 and (optionally) write tags & cover art.
 
 Public helpers
 --------------
-find_and_recognize_audio_files(...)   – bulk scan a folder
-recognize_and_rename_file(...)        – recognise a single file
-update_mp3_cover_art(...)
-update_mp3_tags(...)
-update_ogg_tags(...)
+find_and_recognize_audio_files(...)   – bulk scan
+recognize_and_rename_file(...)        – single file
 """
 
 from __future__ import annotations
 
 import asyncio
+import base64
 import os
 from urllib.request import urlopen
 
@@ -28,9 +26,9 @@ from unidecode import unidecode
 from auto_tag.utils import find_deepest_metadata_key
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# top-level helpers – bulk operation
-# ──────────────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
+# bulk scan helper
+# ─────────────────────────────────────────────────────────────────────────────
 async def find_and_recognize_audio_files(
     folder_path: str,
     *,
@@ -42,26 +40,23 @@ async def find_and_recognize_audio_files(
     output_dir: str | None = None,
     plex_structure: bool = False,
 ) -> None:
-    """
-    Recursively walk *folder_path* and Shazam every file whose extension matches
-    *extensions*.  Each file is handed to `recognize_and_rename_file()`.
-    """
+    """Walk *folder_path* recursively and process every matching file."""
     exts = {e.lower().lstrip(".") for e in extensions}
     audio_files: list[str] = []
 
     for root, _, files in os.walk(folder_path):
         if "test" in os.path.basename(root).lower():
             continue
-        for fname in files:
-            if os.path.splitext(fname)[1].lower().lstrip(".") in exts:
-                audio_files.append(os.path.join(root, fname))
+        for fn in files:
+            if os.path.splitext(fn)[1].lower().lstrip(".") in exts:
+                audio_files.append(os.path.join(root, fn))
 
     if not audio_files:
         print(f"No files with extensions {exts} found in {folder_path}.")
         return
 
     shazam = Shazam()
-    results: list[dict] = []
+    ok = 0
 
     for path in tqdm(audio_files, desc="Recognising and renaming"):
         res = await recognize_and_rename_file(
@@ -74,15 +69,15 @@ async def find_and_recognize_audio_files(
             output_dir=output_dir,
             plex_structure=plex_structure,
         )
-        results.append(res)
+        if "error" not in res:
+            ok += 1
 
-    ok = sum(1 for r in results if "error" not in r)
-    print(f"Succeeded {ok}/{len(results)}.")
+    print(f"Succeeded {ok}/{len(audio_files)}.")
 
 
-# ──────────────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
 # single-file pipeline
-# ──────────────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
 async def recognize_and_rename_file(
     *,
     file_path: str,
@@ -94,43 +89,40 @@ async def recognize_and_rename_file(
     output_dir: str | None,
     plex_structure: bool,
 ) -> dict:
-    """
-    Shazam-recognise *file_path* and build the new filename.
-
-    If *modify* is True, move the file (and write tags/cover art).  
-    Returns a dict with at least: ``file_path`` and (on success) ``new_file_path``.
-    """
-    # ───── 1 · recognise with retry
-    attempt, result = 0, None
+    """Recognise *file_path* and (optionally) move & tag it."""
+    # 1 ── Shazam with retry
+    attempt, out = 0, None
     while attempt < nbr_retry:
         try:
-            result = await shazam.recognize(file_path)
-            if result:
+            out = await shazam.recognize(file_path)
+            if out:
                 break
-        except Exception as exc:  # pragma: no cover – network errors etc.
+        except Exception as exc:
             if trace:
-                print(f"[{os.path.basename(file_path)}] attempt {attempt+1}: {exc}")
+                print(
+                    f"[{os.path.basename(file_path)}] attempt {attempt+1}: {exc}"
+                )
         attempt += 1
         if attempt < nbr_retry:
             await asyncio.sleep(delay)
 
-    if not result or "track" not in result:
+    if not out or "track" not in out:
         if trace:
             print("Shazam failed:", file_path)
         return {"file_path": file_path, "error": "Recognition failed"}
 
-    # ───── 2 · extract & sanitise metadata
-    track = result["track"]
-    title  = track.get("title",    "Unknown Title")
+    # 2 ── metadata
+    track = out["track"]
+    title = track.get("title", "Unknown Title")
     artist = track.get("subtitle", "Unknown Artist")
-    album  = find_deepest_metadata_key(track, "Album") or "Unknown Album"
-    cover  = track.get("images", {}).get("coverart", "")
+    album = find_deepest_metadata_key(track, "Album") or "Unknown Album"
+    cover = track.get("images", {}).get("coverart", "")
 
-    s_title  = _sanitize_string(title,  trace)
-    s_artist = _sanitize_string(artist, trace)
-    s_album  = _sanitize_string(album,  trace)
+    s_title = _sanitize(title, trace)
+    s_artist = _sanitize(artist, trace)
+    s_album = _sanitize(album, trace)
 
-    # ───── 3 · build destination path (DO NOT move yet) ─────
+    # 3 ── destination path
     ext = os.path.splitext(file_path)[1]
     new_name = f"{s_title}{ext}"
 
@@ -139,34 +131,43 @@ async def recognize_and_rename_file(
         base_dir = os.path.join(base_dir, s_artist, s_album)
     os.makedirs(base_dir, exist_ok=True)
 
-    new_path, counter = os.path.join(base_dir, new_name), 1
+    new_path = os.path.join(base_dir, new_name)
+    counter = 1
     while os.path.exists(new_path) and new_path != file_path:
         stem, ext2 = os.path.splitext(new_path)
         new_path = f"{stem} ({counter}){ext2}"
         counter += 1
 
-    # ───── 4 · optionally move & tag ─────
+    # 4 ── move & tag
     if modify:
         os.rename(file_path, new_path)
 
-        # write tags / cover art only now (file exists at new_path)
         try:
             if ext.lower() == ".mp3":
                 update_mp3_tags(new_path, s_title, s_artist, s_album)
                 if cover:
                     update_mp3_cover_art(new_path, cover, trace)
             elif ext.lower() == ".ogg":
-                update_ogg_tags(new_path, s_title, s_artist, s_album, cover, trace)
+                update_ogg_tags(
+                    new_path, s_title, s_artist, s_album, cover, trace
+                )
         except Exception as exc:
             return {"file_path": file_path, "error": f"Tag error: {exc}"}
 
-    # return a uniform structure even in preview mode
-    return {"file_path": file_path, "new_file_path": new_path}
+    # 5 ── success payload
+    return {
+        "file_path": file_path,
+        "new_file_path": new_path,
+        "title": s_title,
+        "author": s_artist,
+        "album": s_album,
+        "cover_link": cover,
+    }
 
 
-# ──────────────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
 # tag helpers
-# ──────────────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
 def update_mp3_cover_art(file_path: str, cover_url: str, trace: bool) -> None:
     if not cover_url:
         if trace:
@@ -180,15 +181,17 @@ def update_mp3_cover_art(file_path: str, cover_url: str, trace: bool) -> None:
     audio.tag.save()
 
 
-def update_mp3_tags(file_path: str, title: str, artist: str, album: str) -> None:
+def update_mp3_tags(
+    file_path: str, title: str, artist: str, album: str
+) -> None:
     audio = eyed3.load(file_path)
     if not audio:
         return
     if audio.tag is None:
         audio.initTag()
-    audio.tag.title  = title
+    audio.tag.title = title
     audio.tag.artist = artist
-    audio.tag.album  = album
+    audio.tag.album = album
     audio.tag.save()
 
 
@@ -201,44 +204,42 @@ def update_ogg_tags(
     trace: bool,
 ) -> None:
     audio = OggVorbis(file_path)
-    audio["TITLE"]  = title
+    audio["TITLE"] = title
     audio["ARTIST"] = artist
-    audio["ALBUM"]  = album
-    audio.save()
+    audio["ALBUM"] = album
 
     if cover_url:
+        # build a FLAC-style picture, then base64-encode for Vorbis comment
         img = urlopen(cover_url).read()
         pic = Picture()
         pic.data = img
         pic.type = 3  # front cover
         pic.mime = "image/jpeg"
-
-        pics = audio.metadata_block_pictures or []
-        pics.append(pic.write())
-        audio.metadata_block_pictures = pics
-        audio.save()
+        pic.width = pic.height = pic.depth = pic.colors = 0
+        b64_data = base64.b64encode(pic.write()).decode("ascii")
+        audio["METADATA_BLOCK_PICTURE"] = [b64_data]
     elif trace:
         print("No cover art for OGG:", file_path)
 
+    audio.save()
 
-# ──────────────────────────────────────────────────────────────────────────────
-# misc utility
-# ──────────────────────────────────────────────────────────────────────────────
-def _sanitize_string(s: str, trace: bool) -> str:
-    """ASCII-fold, strip parens, remove invalid path chars, capitalise words."""
+
+# ─────────────────────────────────────────────────────────────────────────────
+# util
+# ─────────────────────────────────────────────────────────────────────────────
+def _sanitize(s: str, trace: bool) -> str:
     original = s
     s = unidecode(s)
 
-    # remove text inside parentheses
-    cleaned, depth = "", 0
+    out, depth = "", 0
     for ch in s:
         if ch == "(":
             depth += 1
         elif ch == ")" and depth:
             depth -= 1
         elif depth == 0:
-            cleaned += ch
-    s = cleaned or original
+            out += ch
+    s = out or original
 
     for bad in '<>:"/\\|?*':
         s = s.replace(bad, "")
