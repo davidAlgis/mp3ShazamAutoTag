@@ -10,6 +10,7 @@ from shazamio import Shazam
 
 from auto_tag.audio_recognize import (recognize_and_rename_song,
                                       update_mp3_cover_art, update_mp3_tags)
+
 # Global list to store recognition results.
 # Each item is a dict with keys: file_path, new_file_path, title, author, cover_link.
 results_list = []
@@ -21,7 +22,7 @@ def get_base_directory():
     - When frozen by PyInstaller, sys._MEIPASS is used.
     - Otherwise, the directory of the current file is used.
     """
-    if getattr(sys, 'frozen', False):
+    if getattr(sys, "frozen", False):
         # PyInstaller sets sys._MEIPASS to the temp folder containing bundled files.
         return sys._MEIPASS
     else:
@@ -35,20 +36,22 @@ class MP3RenamerGUI:
         self.root = root
         self.root.title("MP3 Shazam Auto Tag")
         self.data = []  # List of dicts with result info and an "apply" flag.
-        self.editing_entry = None  # Reference to the current editing Entry widget.
+        self.editing_entry = (
+            None  # Reference to the current editing Entry widget.
+        )
 
         # Top Frame: Directory input and browse button.
         top_frame = ttk.Frame(root, padding="10")
         top_frame.pack(side=tk.TOP, fill=tk.X)
         ttk.Label(top_frame, text="Input Directory:").pack(side=tk.LEFT)
         self.dir_var = tk.StringVar()
-        self.dir_entry = ttk.Entry(top_frame,
-                                   textvariable=self.dir_var,
-                                   width=50)
+        self.dir_entry = ttk.Entry(
+            top_frame, textvariable=self.dir_var, width=50
+        )
         self.dir_entry.pack(side=tk.LEFT, padx=(5, 0))
-        browse_btn = ttk.Button(top_frame,
-                                text="Browse",
-                                command=self.browse_directory)
+        browse_btn = ttk.Button(
+            top_frame, text="Browse", command=self.browse_directory
+        )
         browse_btn.pack(side=tk.LEFT, padx=5)
 
         # Progress bar frame: includes the bar and an info label.
@@ -56,8 +59,9 @@ class MP3RenamerGUI:
         progress_frame.pack(fill=tk.X)
         self.progress = ttk.Progressbar(progress_frame, mode="determinate")
         self.progress.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 10))
-        self.progress_info = ttk.Label(progress_frame,
-                                       text="0/0, Remaining: 0 sec")
+        self.progress_info = ttk.Label(
+            progress_frame, text="0/0, Remaining: 0 sec"
+        )
         self.progress_info.pack(side=tk.LEFT)
 
         # Set up a custom style for the Treeview to add padding and increase row height.
@@ -68,17 +72,19 @@ class MP3RenamerGUI:
         # Middle Frame: Treeview for displaying MP3 file info.
         tree_frame = ttk.Frame(root, padding="10")
         tree_frame.pack(fill=tk.BOTH, expand=True)
-        self.tree = ttk.Treeview(tree_frame,
-                                 columns=("apply", "old", "new"),
-                                 show="headings",
-                                 style="Custom.Treeview")
+        self.tree = ttk.Treeview(
+            tree_frame,
+            columns=("apply", "old", "new"),
+            show="headings",
+            style="Custom.Treeview",
+        )
         self.tree.heading("apply", text="Apply")
-        self.tree.heading("old",
-                          text="Old Name",
-                          command=lambda: self.sort_by("old"))
-        self.tree.heading("new",
-                          text="New Name",
-                          command=lambda: self.sort_by("new"))
+        self.tree.heading(
+            "old", text="Old Name", command=lambda: self.sort_by("old")
+        )
+        self.tree.heading(
+            "new", text="New Name", command=lambda: self.sort_by("new")
+        )
         self.tree.column("apply", width=80, anchor="center")
         self.tree.column("old", width=300, anchor="w")
         self.tree.column("new", width=300, anchor="w")
@@ -89,9 +95,9 @@ class MP3RenamerGUI:
         self.tree.tag_configure("No", foreground="#DB504A")  # Red color
 
         # Allow user to adjust column widths by adding a scrollbar.
-        scrollbar = ttk.Scrollbar(tree_frame,
-                                  orient="vertical",
-                                  command=self.tree.yview)
+        scrollbar = ttk.Scrollbar(
+            tree_frame, orient="vertical", command=self.tree.yview
+        )
         self.tree.configure(yscrollcommand=scrollbar.set)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
@@ -104,17 +110,17 @@ class MP3RenamerGUI:
         # Bottom Frame: Apply and Check/Uncheck buttons.
         bottom_frame = ttk.Frame(root, padding="10")
         bottom_frame.pack(side=tk.BOTTOM, fill=tk.X)
-        apply_btn = ttk.Button(bottom_frame,
-                               text="Apply",
-                               command=self.apply_changes)
+        apply_btn = ttk.Button(
+            bottom_frame, text="Apply", command=self.apply_changes
+        )
         apply_btn.pack(side=tk.RIGHT, padx=(5, 0))
-        uncheck_all_btn = ttk.Button(bottom_frame,
-                                     text="Uncheck All",
-                                     command=self.uncheck_all)
+        uncheck_all_btn = ttk.Button(
+            bottom_frame, text="Uncheck All", command=self.uncheck_all
+        )
         uncheck_all_btn.pack(side=tk.RIGHT, padx=5)
-        check_all_btn = ttk.Button(bottom_frame,
-                                   text="Check All",
-                                   command=self.check_all)
+        check_all_btn = ttk.Button(
+            bottom_frame, text="Check All", command=self.check_all
+        )
         check_all_btn.pack(side=tk.RIGHT, padx=5)
 
         self.start_time = None  # To track when processing started.
@@ -135,8 +141,9 @@ class MP3RenamerGUI:
         self.progress.config(value=0)
         self.progress_info.config(text="0/0, Remaining: 0 sec")
         # Run recognition in a separate thread.
-        thread = threading.Thread(target=self.run_recognition,
-                                  args=(directory, ))
+        thread = threading.Thread(
+            target=self.run_recognition, args=(directory,)
+        )
         thread.start()
 
     def run_recognition(self, directory):
@@ -155,27 +162,35 @@ class MP3RenamerGUI:
         self.total_files = len(mp3_files)
         if self.total_files == 0:
             self.root.after(
-                0, lambda: messagebox.showinfo(
-                    "Info", f"No MP3 files found in {directory}"))
+                0,
+                lambda: messagebox.showinfo(
+                    "Info", f"No MP3 files found in {directory}"
+                ),
+            )
             return
-        self.root.after(0,
-                        lambda: self.progress.config(maximum=self.total_files))
+        self.root.after(
+            0, lambda: self.progress.config(maximum=self.total_files)
+        )
         self.start_time = time.time()
         shazam = Shazam()
         count = 0
         for file_name, file_path in mp3_files:
             try:
-                result = await recognize_and_rename_song(file_path,
-                                                         file_name,
-                                                         shazam,
-                                                         modify=False,
-                                                         delay=10,
-                                                         nbrRetry=3,
-                                                         trace=False)
+                result = await recognize_and_rename_song(
+                    file_path,
+                    file_name,
+                    shazam,
+                    modify=False,
+                    delay=10,
+                    nbrRetry=3,
+                    trace=False,
+                )
                 # Set apply to False if no title, artist, or album is found
-                if result.get("title") == "Unknown Title" or result.get(
-                        "author") == "Unknown Artist" or result.get(
-                            "album") == "Unknown Album":
+                if (
+                    result.get("title") == "Unknown Title"
+                    or result.get("author") == "Unknown Artist"
+                    or result.get("album") == "Unknown Album"
+                ):
                     result["apply"] = False
                 else:
                     result["apply"] = True
@@ -187,12 +202,14 @@ class MP3RenamerGUI:
             avg_time = elapsed / count if count else 0
             remaining = int(avg_time * (self.total_files - count))
             self.root.after(
-                0, lambda c=count, r=remaining: self.update_progress(c, r))
+                0, lambda c=count, r=remaining: self.update_progress(c, r)
+            )
 
     def update_progress(self, count, remaining):
         self.progress.config(value=count)
         self.progress_info.config(
-            text=f"{count}/{self.total_files}, Remaining: {remaining} sec")
+            text=f"{count}/{self.total_files}, Remaining: {remaining} sec"
+        )
 
     def populate_tree(self):
         for result in results_list:
@@ -201,10 +218,13 @@ class MP3RenamerGUI:
             self.tree.insert(
                 "",
                 "end",
-                values=(apply_value,
-                        os.path.basename(result.get("file_path", "")),
-                        os.path.basename(result.get("new_file_path", ""))),
-                tags=(apply_value, ))
+                values=(
+                    apply_value,
+                    os.path.basename(result.get("file_path", "")),
+                    os.path.basename(result.get("new_file_path", "")),
+                ),
+                tags=(apply_value,),
+            )
         if not self.data:
             messagebox.showinfo("Info", "No MP3 files were processed.")
 
@@ -222,7 +242,7 @@ class MP3RenamerGUI:
             self.data[index]["apply"] = not self.data[index].get("apply", True)
             new_value = "Yes" if self.data[index]["apply"] else "No"
             self.tree.set(row_id, "apply", new_value)
-            self.tree.item(row_id, tags=(new_value, ))
+            self.tree.item(row_id, tags=(new_value,))
 
     def on_enter(self, event):
         # Toggle the "Apply" flag for the focused row when Enter is pressed.
@@ -233,7 +253,7 @@ class MP3RenamerGUI:
         self.data[index]["apply"] = not self.data[index].get("apply", True)
         new_value = "Yes" if self.data[index]["apply"] else "No"
         self.tree.set(row_id, "apply", new_value)
-        self.tree.item(row_id, tags=(new_value, ))
+        self.tree.item(row_id, tags=(new_value,))
 
     def on_double_click(self, event):
         # Determine which cell was double-clicked.
@@ -250,7 +270,7 @@ class MP3RenamerGUI:
             self.data[index]["apply"] = not self.data[index].get("apply", True)
             new_value = "Yes" if self.data[index]["apply"] else "No"
             self.tree.set(row_id, "apply", new_value)
-            self.tree.item(row_id, tags=(new_value, ))
+            self.tree.item(row_id, tags=(new_value,))
         # If the third column is double-clicked, allow editing of the new file name.
         elif column == "#3":
             x, y, width, height = self.tree.bbox(row_id, column)
@@ -262,10 +282,12 @@ class MP3RenamerGUI:
             self.editing_entry.insert(0, current_text)
             self.editing_entry.focus()
             # Bind Return key and focus out to finish editing.
-            self.editing_entry.bind("<Return>",
-                                    lambda e: self.finish_editing(row_id))
-            self.editing_entry.bind("<FocusOut>",
-                                    lambda e: self.finish_editing(row_id))
+            self.editing_entry.bind(
+                "<Return>", lambda e: self.finish_editing(row_id)
+            )
+            self.editing_entry.bind(
+                "<FocusOut>", lambda e: self.finish_editing(row_id)
+            )
 
     def finish_editing(self, row_id):
         if self.editing_entry:
@@ -279,7 +301,8 @@ class MP3RenamerGUI:
             dir_path = os.path.dirname(old_new_path) if old_new_path else ""
             if dir_path:
                 self.data[index]["new_file_path"] = os.path.join(
-                    dir_path, new_value)
+                    dir_path, new_value
+                )
             else:
                 self.data[index]["new_file_path"] = new_value
             self.editing_entry.destroy()
@@ -288,10 +311,14 @@ class MP3RenamerGUI:
     def sort_by(self, key):
         if key == "old":
             self.data.sort(
-                key=lambda x: os.path.basename(x.get("file_path", "")).lower())
+                key=lambda x: os.path.basename(x.get("file_path", "")).lower()
+            )
         elif key == "new":
-            self.data.sort(key=lambda x: os.path.basename(
-                x.get("new_file_path", "")).lower())
+            self.data.sort(
+                key=lambda x: os.path.basename(
+                    x.get("new_file_path", "")
+                ).lower()
+            )
         for item in self.tree.get_children():
             self.tree.delete(item)
         for result in self.data:
@@ -299,24 +326,27 @@ class MP3RenamerGUI:
             self.tree.insert(
                 "",
                 "end",
-                values=(apply_value,
-                        os.path.basename(result.get("file_path", "")),
-                        os.path.basename(result.get("new_file_path", ""))),
-                tags=(apply_value, ))
+                values=(
+                    apply_value,
+                    os.path.basename(result.get("file_path", "")),
+                    os.path.basename(result.get("new_file_path", "")),
+                ),
+                tags=(apply_value,),
+            )
 
     def check_all(self):
         for idx, result in enumerate(self.data):
             result["apply"] = True
             item_id = self.tree.get_children()[idx]
             self.tree.set(item_id, "apply", "Yes")
-            self.tree.item(item_id, tags=("Yes", ))
+            self.tree.item(item_id, tags=("Yes",))
 
     def uncheck_all(self):
         for idx, result in enumerate(self.data):
             result["apply"] = False
             item_id = self.tree.get_children()[idx]
             self.tree.set(item_id, "apply", "No")
-            self.tree.item(item_id, tags=("No", ))
+            self.tree.item(item_id, tags=("No",))
 
     def apply_changes(self):
         errors = []
@@ -335,16 +365,21 @@ class MP3RenamerGUI:
                         counter += 1
                     os.rename(old_path, unique_new_path)
                     base_name = os.path.splitext(
-                        os.path.basename(unique_new_path))[0]
+                        os.path.basename(unique_new_path)
+                    )[0]
                     parts = base_name.split(" - ")
                     album = parts[2] if len(parts) >= 3 else "Unknown Album"
-                    update_mp3_tags(unique_new_path,
-                                    result.get("title", "Unknown Title"),
-                                    result.get("author", "Unknown Artist"),
-                                    album)
-                    update_mp3_cover_art(unique_new_path,
-                                         result.get("cover_link", ""),
-                                         trace=False)
+                    update_mp3_tags(
+                        unique_new_path,
+                        result.get("title", "Unknown Title"),
+                        result.get("author", "Unknown Artist"),
+                        album,
+                    )
+                    update_mp3_cover_art(
+                        unique_new_path,
+                        result.get("cover_link", ""),
+                        trace=False,
+                    )
                 except Exception as e:
                     errors.append(f"Error processing {old_path}: {e}")
         if errors:
