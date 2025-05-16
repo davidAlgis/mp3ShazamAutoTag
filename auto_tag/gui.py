@@ -1,14 +1,15 @@
+import asyncio
 import os
 import sys
-import asyncio
 import threading
 import time
 import tkinter as tk
-from tkinter import ttk, filedialog, messagebox
-from auto_tag.mp3_recognize import (recognize_and_rename_song, update_mp3_tags,
-                                    update_mp3_cover_art)
+from tkinter import filedialog, messagebox, ttk
+
 from shazamio import Shazam
 
+from auto_tag.audio_recognize import (recognize_and_rename_song,
+                                      update_mp3_cover_art, update_mp3_tags)
 # Global list to store recognition results.
 # Each item is a dict with keys: file_path, new_file_path, title, author, cover_link.
 results_list = []
