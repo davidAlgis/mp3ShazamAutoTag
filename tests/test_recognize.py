@@ -1,98 +1,108 @@
 import os
 
 import pytest
-from shazamio import Shazam
 
-from auto_tag.audio_recognize import (recognize_and_rename_file,
-                                      recognize_and_rename_song)
+from auto_tag import audio_recognize
+from auto_tag.audio_recognize import recognize_and_rename_file
 
-# Define the extensions to test
+
+# -------------------------------------------------
+# Dummy Shazam stub that always returns fixed metadata
+# matching the structure produced by shazamio so that
+# find_deepest_metadata_key() can locate the album name.
+# -------------------------------------------------
+class DummyShazam:
+    async def recognize(self, file_path):
+        return {
+            "track": {
+                "title": "Drive My Car",
+                "subtitle": "The Beatles",
+                "images": {"coverart": ""},
+                "sections": [
+                    {"metadata": [{"title": "Album", "text": "Rubber Soul"}]}
+                ],
+            }
+        }
+
+
+# Extensions we want to test on
 test_extensions = ["mp3", "ogg"]
 
 
-@pytest.mark.asyncio
-@pytest.mark.parametrize("ext", test_extensions)
-async def test_recognize_and_rename_song(ext):
-    """
-    Test that MP3 and OGG files are recognized and renamed correctly in flat structure.
-    """
-    test_folder = os.path.dirname(os.path.realpath(__file__))
-    filename = f"fileToTest.{ext}"
-    test_file_path = os.path.join(test_folder, filename)
-    expected_new_name = f"Drive My Car - The Beatles - Rubber Soul.{ext}"
-    expected_new_file_path = os.path.join(test_folder, expected_new_name)
-
-    # Reset if the expected file already exists
-    if os.path.exists(expected_new_file_path):
-        os.replace(expected_new_file_path, test_file_path)
-
-    # Ensure the original test file exists
-    assert os.path.exists(
-        test_file_path
-    ), f"Error: The test file {filename} does not exist, so the test could not be launched."
-
-    # Recognize and rename
-    shazam = Shazam()
-    result = await recognize_and_rename_song(
-        test_file_path, filename, shazam, modify=True
+# -------------------------------------------------
+# Helper to neuter tag‑writing functions so tests don’t
+# depend on valid audio binaries / mutagen behaviour.
+# -------------------------------------------------
+@pytest.fixture(autouse=True)
+def patch_tag_functions(monkeypatch):
+    monkeypatch.setattr(
+        audio_recognize, "update_mp3_tags", lambda *a, **k: None
+    )
+    monkeypatch.setattr(
+        audio_recognize, "update_mp3_cover_art", lambda *a, **k: None
+    )
+    monkeypatch.setattr(
+        audio_recognize, "update_ogg_tags", lambda *a, **k: None
     )
 
-    # Verify the file was renamed correctly
-    assert os.path.exists(
-        expected_new_file_path
-    ), f"Test Failed for .{ext.upper()}: The file was not correctly renamed."
 
-    # Cleanup
-    os.replace(expected_new_file_path, test_file_path)
-
-
+# -------------------------------------------------
+# Flat structure test
+# -------------------------------------------------
 @pytest.mark.asyncio
 @pytest.mark.parametrize("ext", test_extensions)
-async def test_recognize_and_rename_song_with_plex(ext):
-    """
-    Test that MP3 and OGG files are recognized and placed in Plex (Artist/Album) structure.
-    """
-    test_folder = os.path.dirname(os.path.realpath(__file__))
-    filename = f"fileToTest.{ext}"
-    test_file_path = os.path.join(test_folder, filename)
-    # Expected nested directory based on metadata
-    artist_dir = os.path.join(test_folder, "The Beatles")
-    album_dir = os.path.join(artist_dir, "Rubber Soul")
-    expected_new_path = os.path.join(album_dir, f"Drive My Car.{ext}")
+async def test_recognize_and_rename_file_flat(tmp_path, ext):
+    """The file should be moved/renamed to Drive My Car.<ext> in the same folder."""
+    # Arrange – create dummy audio file
+    test_file = tmp_path / f"fileToTest.{ext}"
+    test_file.write_bytes(b"dummy audio data")
 
-    # Reset if already moved by a previous run
-    if os.path.exists(expected_new_path):
-        os.replace(expected_new_path, test_file_path)
-        # Remove empty Plex directories
-        os.removedirs(album_dir)
+    expected = tmp_path / f"Drive My Car.{ext}"
 
-    # Ensure the original file exists
-    assert os.path.exists(
-        test_file_path
-    ), f"Error: The test file {filename} does not exist, so the Plex test could not be launched."
-
-    # Recognize and rename with Plex structure
-    shazam = Shazam()
+    # Act
     result = await recognize_and_rename_file(
-        test_file_path,
-        shazam,
+        file_path=str(test_file),
+        shazam=DummyShazam(),
         modify=True,
-        delay=1,
+        delay=0,
         nbr_retry=1,
         trace=False,
-        output_dir=None,
+        output_dir=str(tmp_path),
+        plex_structure=False,
+    )
+
+    # Assert
+    assert result.get("new_file_path") == str(expected)
+    assert expected.exists(), f"File not found at {expected}"
+
+
+# -------------------------------------------------
+# Plex structure test
+# -------------------------------------------------
+@pytest.mark.asyncio
+@pytest.mark.parametrize("ext", test_extensions)
+async def test_recognize_and_rename_file_with_plex(tmp_path, ext):
+    """The file should be moved to <artist>/<album>/Drive My Car.<ext>."""
+    # Arrange – create dummy audio file
+    test_file = tmp_path / f"fileToTest.{ext}"
+    test_file.write_bytes(b"dummy audio data")
+
+    artist_dir = tmp_path / "The Beatles"
+    album_dir = artist_dir / "Rubber Soul"
+    expected = album_dir / f"Drive My Car.{ext}"
+
+    # Act
+    result = await recognize_and_rename_file(
+        file_path=str(test_file),
+        shazam=DummyShazam(),
+        modify=True,
+        delay=0,
+        nbr_retry=1,
+        trace=False,
+        output_dir=str(tmp_path),
         plex_structure=True,
     )
 
-    new_path = result.get("new_file_path")
-    # Verify returned path and actual file location
-    assert (
-        new_path == expected_new_path
-    ), f"Expected new path {expected_new_path}, got {new_path}"
-    assert os.path.exists(
-        expected_new_path
-    ), f"Plex structure test failed for .{ext.upper()}: File not found at {expected_new_path}."
-
-    # Cleanup: move back and remove Plex dirs
-    os.replace(expected_new_path, test_file_path)
-    os.removedirs(album_dir)
+    # Assert
+    assert result.get("new_file_path") == str(expected)
+    assert expected.exists(), f"File not found at {expected}"
