@@ -84,6 +84,7 @@ async def main():
         help="Base output directory for moved files (default: same folder)",
     )
     parser.add_argument(
+        "-p",
         "--plex",
         action="store_true",
         help="Organize output into Plex structure: Artist/Album/Title.ext",
