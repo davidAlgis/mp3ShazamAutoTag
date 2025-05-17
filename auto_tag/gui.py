@@ -11,11 +11,12 @@ from tkinter import filedialog, messagebox, ttk
 
 from shazamio import Shazam
 
-# project helpers ────────────────────────────────────────────────────────────
-from auto_tag.audio_recognize import _sanitize as sanitize
 from auto_tag.audio_recognize import (recognize_and_rename_file,
                                       update_mp3_cover_art, update_mp3_tags,
                                       update_ogg_tags)
+
+# project helpers ────────────────────────────────────────────────────────────
+
 
 # shared results list between worker thread and main thread
 RESULTS: list[dict] = []

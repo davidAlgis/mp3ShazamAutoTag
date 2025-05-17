@@ -1,3 +1,6 @@
+from unidecode import unidecode
+
+
 def find_deepest_metadata_key(data, search_key):
     """
     Recursively searches for the 'text' value corresponding to a given 'title' key
@@ -30,3 +33,29 @@ def find_deepest_metadata_key(data, search_key):
 
     # If no match is found, return None
     return None
+
+
+def sanitize(s: str, trace: bool) -> str:
+    original = s
+    s = unidecode(s)
+
+    out, depth = "", 0
+    for ch in s:
+        if ch == "(":
+            depth += 1
+        elif ch == ")" and depth:
+            depth -= 1
+        elif depth == 0:
+            out += ch
+    s = out or original
+
+    for bad in '<>:"/\\|?*':
+        s = s.replace(bad, "")
+    s = s.replace("&", "-")
+    s = " ".join(w.capitalize() for w in s.split())
+
+    if not s.strip():
+        if trace:
+            print("sanitize produced empty string for:", original)
+        s = "Unknown"
+    return s

@@ -21,9 +21,8 @@ from mutagen.flac import Picture
 from mutagen.oggvorbis import OggVorbis
 from shazamio import Shazam
 from tqdm.asyncio import tqdm
-from unidecode import unidecode
 
-from auto_tag.utils import find_deepest_metadata_key
+from auto_tag.utils import find_deepest_metadata_key, sanitize
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -118,9 +117,9 @@ async def recognize_and_rename_file(
     album = find_deepest_metadata_key(track, "Album") or "Unknown Album"
     cover = track.get("images", {}).get("coverart", "")
 
-    s_title = _sanitize(title, trace)
-    s_artist = _sanitize(artist, trace)
-    s_album = _sanitize(album, trace)
+    s_title = sanitize(title, trace)
+    s_artist = sanitize(artist, trace)
+    s_album = sanitize(album, trace)
 
     # 3 ── destination path
     ext = os.path.splitext(file_path)[1]
@@ -222,32 +221,3 @@ def update_ogg_tags(
         print("No cover art for OGG:", file_path)
 
     audio.save()
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# util
-# ─────────────────────────────────────────────────────────────────────────────
-def _sanitize(s: str, trace: bool) -> str:
-    original = s
-    s = unidecode(s)
-
-    out, depth = "", 0
-    for ch in s:
-        if ch == "(":
-            depth += 1
-        elif ch == ")" and depth:
-            depth -= 1
-        elif depth == 0:
-            out += ch
-    s = out or original
-
-    for bad in '<>:"/\\|?*':
-        s = s.replace(bad, "")
-    s = s.replace("&", "-")
-    s = " ".join(w.capitalize() for w in s.split())
-
-    if not s.strip():
-        if trace:
-            print("sanitize produced empty string for:", original)
-        s = "Unknown"
-    return s
