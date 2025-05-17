@@ -57,7 +57,7 @@ async def test_recognize_and_rename_file_flat(tmp_path, ext):
     test_file = tmp_path / f"fileToTest.{ext}"
     test_file.write_bytes(b"dummy audio data")
 
-    expected = tmp_path / f"Drive My Car.{ext}"
+    expected = tmp_path / f"Drive My Car - The Beatles - Rubber Soul.{ext}"
 
     # Act
     result = await recognize_and_rename_file(
