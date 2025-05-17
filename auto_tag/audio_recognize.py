@@ -123,7 +123,11 @@ async def recognize_and_rename_file(
 
     # 3 ── destination path
     ext = os.path.splitext(file_path)[1]
-    new_name = f"{s_title}{ext}"
+
+    if plex_structure:
+        new_name = f"{s_title}{ext}"  # Title.ext
+    else:
+        new_name = f"{s_title} - {s_artist} - {s_album}{ext}"  # Title - Artist - Album.ext
 
     base_dir = output_dir or os.path.dirname(file_path)
     if plex_structure:
