@@ -3,10 +3,8 @@
 Recognise audio files with Shazam, optionally rename them,
 and (optionally) write tags & cover art.
 
-Public helpers
---------------
-find_and_recognize_audio_files(...)   – bulk scan
-recognize_and_rename_file(...)        – single file
+OGG files are decoded to a temporary WAV via soundfile/libsndfile – no external
+ffmpeg binary required.
 """
 
 from __future__ import annotations
@@ -14,9 +12,11 @@ from __future__ import annotations
 import asyncio
 import base64
 import os
+import tempfile
 from urllib.request import urlopen
 
 import eyed3
+import soundfile as sf
 from mutagen.flac import Picture
 from mutagen.oggvorbis import OggVorbis
 from shazamio import Shazam
@@ -35,11 +35,10 @@ async def find_and_recognize_audio_files(
     delay: int = 10,
     nbr_retry: int = 3,
     trace: bool = False,
-    extensions: list[str] | tuple[str, ...] = ("mp3",),
+    extensions: list[str] | tuple[str, ...] = ("mp3", "ogg"),
     output_dir: str | None = None,
     plex_structure: bool = False,
 ) -> None:
-    """Walk *folder_path* recursively and process every matching file."""
     exts = {e.lower().lstrip(".") for e in extensions}
     audio_files: list[str] = []
 
@@ -56,7 +55,6 @@ async def find_and_recognize_audio_files(
 
     shazam = Shazam()
     ok = 0
-
     for path in tqdm(audio_files, desc="Recognising and renaming"):
         res = await recognize_and_rename_file(
             file_path=path,
@@ -88,22 +86,45 @@ async def recognize_and_rename_file(
     output_dir: str | None,
     plex_structure: bool,
 ) -> dict:
-    """Recognise *file_path* and (optionally) move & tag it."""
-    # 1 ── Shazam with retry
-    attempt, out = 0, None
-    while attempt < nbr_retry:
-        try:
-            out = await shazam.recognize(file_path)
-            if out:
-                break
-        except Exception as exc:
-            if trace:
-                print(
-                    f"[{os.path.basename(file_path)}] attempt {attempt+1}: {exc}"
-                )
-        attempt += 1
-        if attempt < nbr_retry:
-            await asyncio.sleep(delay)
+    """Recognise *file_path* with Shazam, optionally rename & tag it."""
+
+    ext = os.path.splitext(file_path)[1].lower()
+    tmp_wav: str | None = None
+
+    # 1 ── Shazam with retry (OGG → temp WAV if needed)
+    try:
+        input_path = file_path
+        if ext == ".ogg":
+            fd, tmp_wav = tempfile.mkstemp(suffix=".wav")
+            os.close(fd)
+            try:
+                data, sr = sf.read(file_path, dtype="int16")
+                sf.write(tmp_wav, data, sr, subtype="PCM_16")
+                input_path = tmp_wav
+            except Exception as exc:
+                if trace:
+                    print(f"OGG→WAV conversion failed for {file_path}: {exc}")
+                return {"file_path": file_path, "error": "Conversion failed"}
+
+        attempt, out = 0, None
+        while attempt < nbr_retry:
+            try:
+                out = await shazam.recognize(input_path)
+                if out:
+                    break
+            except Exception as exc:
+                if trace:
+                    print(
+                        f"[{os.path.basename(file_path)}] attempt {attempt+1}:"
+                        f"{exc}"
+                    )
+            attempt += 1
+            if attempt < nbr_retry:
+                await asyncio.sleep(delay)
+
+    finally:
+        if tmp_wav and os.path.exists(tmp_wav):
+            os.remove(tmp_wav)
 
     if not out or "track" not in out:
         if trace:
@@ -122,12 +143,10 @@ async def recognize_and_rename_file(
     s_album = sanitize(album, trace)
 
     # 3 ── destination path
-    ext = os.path.splitext(file_path)[1]
-
     if plex_structure:
-        new_name = f"{s_title}{ext}"  # Title.ext
+        new_name = f"{s_title}{ext}"
     else:
-        new_name = f"{s_title} - {s_artist} - {s_album}{ext}"  # Title - Artist - Album.ext
+        new_name = f"{s_title} - {s_artist} - {s_album}{ext}"
 
     base_dir = output_dir or os.path.dirname(file_path)
     if plex_structure:
@@ -144,13 +163,12 @@ async def recognize_and_rename_file(
     # 4 ── move & tag
     if modify:
         os.rename(file_path, new_path)
-
         try:
-            if ext.lower() == ".mp3":
+            if ext == ".mp3":
                 update_mp3_tags(new_path, s_title, s_artist, s_album)
                 if cover:
                     update_mp3_cover_art(new_path, cover, trace)
-            elif ext.lower() == ".ogg":
+            elif ext == ".ogg":
                 update_ogg_tags(
                     new_path, s_title, s_artist, s_album, cover, trace
                 )
@@ -169,7 +187,7 @@ async def recognize_and_rename_file(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# tag helpers
+# tag helpers (unchanged)
 # ─────────────────────────────────────────────────────────────────────────────
 def update_mp3_cover_art(file_path: str, cover_url: str, trace: bool) -> None:
     if not cover_url:
@@ -212,15 +230,14 @@ def update_ogg_tags(
     audio["ALBUM"] = album
 
     if cover_url:
-        # build a FLAC-style picture, then base64-encode for Vorbis comment
         img = urlopen(cover_url).read()
         pic = Picture()
         pic.data = img
-        pic.type = 3  # front cover
+        pic.type = 3
         pic.mime = "image/jpeg"
         pic.width = pic.height = pic.depth = pic.colors = 0
-        b64_data = base64.b64encode(pic.write()).decode("ascii")
-        audio["METADATA_BLOCK_PICTURE"] = [b64_data]
+        b64 = base64.b64encode(pic.write()).decode("ascii")
+        audio["METADATA_BLOCK_PICTURE"] = [b64]
     elif trace:
         print("No cover art for OGG:", file_path)
 
