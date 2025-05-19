@@ -17,7 +17,9 @@ from urllib.request import urlopen
 
 import eyed3
 import soundfile as sf
+from mutagen import File
 from mutagen.flac import Picture
+from mutagen.oggopus import OggOpus
 from mutagen.oggvorbis import OggVorbis
 from shazamio import Shazam
 from tqdm.asyncio import tqdm
@@ -66,6 +68,10 @@ async def find_and_recognize_audio_files(
             output_dir=output_dir,
             plex_structure=plex_structure,
         )
+
+        if "error" in res and trace:
+            print(f"[{os.path.basename(path)}] {res['error']}")
+
         if "error" not in res:
             ok += 1
 
@@ -187,7 +193,7 @@ async def recognize_and_rename_file(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# tag helpers (unchanged)
+# tag helpers
 # ─────────────────────────────────────────────────────────────────────────────
 def update_mp3_cover_art(file_path: str, cover_url: str, trace: bool) -> None:
     if not cover_url:
@@ -224,20 +230,39 @@ def update_ogg_tags(
     cover_url: str,
     trace: bool,
 ) -> None:
-    audio = OggVorbis(file_path)
+    try:
+        audio = OggVorbis(file_path)
+    except Exception:
+        try:
+            audio = OggOpus(file_path)
+        except Exception:
+            if trace:
+                print(
+                    f"[{os.path.basename(file_path)}] Not Vorbis or Opus:"
+                    f"fallback to generic"
+                )
+            audio = File(file_path)
+            if audio is None:
+                raise RuntimeError("Could not tag file: unsupported OGG type")
+
+    # Common tags for both
     audio["TITLE"] = title
     audio["ARTIST"] = artist
     audio["ALBUM"] = album
 
     if cover_url:
-        img = urlopen(cover_url).read()
-        pic = Picture()
-        pic.data = img
-        pic.type = 3
-        pic.mime = "image/jpeg"
-        pic.width = pic.height = pic.depth = pic.colors = 0
-        b64 = base64.b64encode(pic.write()).decode("ascii")
-        audio["METADATA_BLOCK_PICTURE"] = [b64]
+        try:
+            img = urlopen(cover_url).read()
+            pic = Picture()
+            pic.data = img
+            pic.type = 3
+            pic.mime = "image/jpeg"
+            pic.width = pic.height = pic.depth = pic.colors = 0
+            b64 = base64.b64encode(pic.write()).decode("ascii")
+            audio["METADATA_BLOCK_PICTURE"] = [b64]
+        except Exception as exc:
+            if trace:
+                print("Cover art error:", exc)
     elif trace:
         print("No cover art for OGG:", file_path)
 
