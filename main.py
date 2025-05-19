@@ -114,7 +114,7 @@ async def main():
             extensions=exts,
             output_dir=args.output,
             plex_structure=args.plex,
-            copy_path=args.copy,
+            copy_to=args.copy,
         )
 
 
