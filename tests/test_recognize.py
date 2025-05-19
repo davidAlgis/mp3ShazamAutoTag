@@ -1,4 +1,6 @@
 import os
+import shutil
+from pathlib import Path
 
 import pytest
 
@@ -7,31 +9,46 @@ from auto_tag.audio_recognize import recognize_and_rename_file
 
 
 # -------------------------------------------------
-# Dummy Shazam stub that always returns fixed metadata
-# matching the structure produced by shazamio so that
-# find_deepest_metadata_key() can locate the album name.
+# Dummy Shazam stub that returns metadata based on extension
 # -------------------------------------------------
 class DummyShazam:
     async def recognize(self, file_path):
-        return {
-            "track": {
-                "title": "Drive My Car",
-                "subtitle": "The Beatles",
-                "images": {"coverart": ""},
-                "sections": [
-                    {"metadata": [{"title": "Album", "text": "Rubber Soul"}]}
-                ],
+        ext = os.path.splitext(file_path)[1].lower()
+        if ext == ".mp3":
+            return {
+                "track": {
+                    "title": "Drive My Car",
+                    "subtitle": "The Beatles",
+                    "images": {"coverart": ""},
+                    "sections": [
+                        {
+                            "metadata": [
+                                {"title": "Album", "text": "Rubber Soul"}
+                            ]
+                        }
+                    ],
+                }
             }
-        }
+        elif ext == ".ogg":
+            return {
+                "track": {
+                    "title": "Bring Me To Life",
+                    "subtitle": "Evanescence",
+                    "images": {"coverart": ""},
+                    "sections": [
+                        {"metadata": [{"title": "Album", "text": "Fallen"}]}
+                    ],
+                }
+            }
+        return {}
 
 
-# Extensions we want to test on
+# Extensions to test
 test_extensions = ["mp3", "ogg"]
 
 
 # -------------------------------------------------
-# Helper to neuter tag‑writing functions so tests don’t
-# depend on valid audio binaries / mutagen behaviour.
+# Disable actual tag-writing (so tests don’t need real audio)
 # -------------------------------------------------
 @pytest.fixture(autouse=True)
 def patch_tag_functions(monkeypatch):
@@ -52,16 +69,27 @@ def patch_tag_functions(monkeypatch):
 @pytest.mark.asyncio
 @pytest.mark.parametrize("ext", test_extensions)
 async def test_recognize_and_rename_file_flat(tmp_path, ext):
-    """The file should be moved/renamed to Drive My Car.<ext> in the same folder."""
-    # Arrange – create dummy audio file
-    test_file = tmp_path / f"fileToTest.{ext}"
-    test_file.write_bytes(b"dummy audio data")
+    """
+    The file should be renamed to:
+      - Drive My Car - The Beatles - Rubber Soul.mp3
+      - Bring Me To Life - Evanescence - Fallen.ogg
+    """
+    # Copy the real test file into tmp_path
+    src = Path(__file__).parent / f"fileToTest.{ext}"
+    dest = tmp_path / f"fileToTest.{ext}"
+    shutil.copy2(src, dest)
 
-    expected = tmp_path / f"Drive My Car - The Beatles - Rubber Soul.{ext}"
+    # Expected filename
+    expected_name = (
+        "Drive My Car - The Beatles - Rubber Soul.mp3"
+        if ext == "mp3"
+        else "Bring Me To Life - Evanescence - Fallen.ogg"
+    )
+    expected = tmp_path / expected_name
 
     # Act
     result = await recognize_and_rename_file(
-        file_path=str(test_file),
+        file_path=str(dest),
         shazam=DummyShazam(),
         modify=True,
         delay=0,
@@ -82,18 +110,26 @@ async def test_recognize_and_rename_file_flat(tmp_path, ext):
 @pytest.mark.asyncio
 @pytest.mark.parametrize("ext", test_extensions)
 async def test_recognize_and_rename_file_with_plex(tmp_path, ext):
-    """The file should be moved to <artist>/<album>/Drive My Car.<ext>."""
-    # Arrange – create dummy audio file
-    test_file = tmp_path / f"fileToTest.{ext}"
-    test_file.write_bytes(b"dummy audio data")
+    """
+    The file should be placed under:
+      <artist>/<album>/Drive My Car.mp3
+      <artist>/<album>/Bring Me To Life.ogg
+    """
+    # Copy the real test file into tmp_path
+    src = Path(__file__).parent / f"fileToTest.{ext}"
+    dest = tmp_path / f"fileToTest.{ext}"
+    shutil.copy2(src, dest)
 
-    artist_dir = tmp_path / "The Beatles"
-    album_dir = artist_dir / "Rubber Soul"
-    expected = album_dir / f"Drive My Car.{ext}"
+    # Determine expected path components
+    if ext == "mp3":
+        artist, album, name = "The Beatles", "Rubber Soul", "Drive My Car.mp3"
+    else:
+        artist, album, name = "Evanescence", "Fallen", "Bring Me To Life.ogg"
+    expected = tmp_path / artist / album / name
 
     # Act
     result = await recognize_and_rename_file(
-        file_path=str(test_file),
+        file_path=str(dest),
         shazam=DummyShazam(),
         modify=True,
         delay=0,
