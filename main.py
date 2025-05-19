@@ -20,7 +20,8 @@ def str2bool(v):
 
 async def main():
     parser = argparse.ArgumentParser(
-        description="Process audio files with Shazam recognition and optional renaming and tagging."
+        description="Process audio files with Shazam recognition and optional"
+        "renaming and tagging."
     )
     parser.add_argument(
         "-di",
@@ -42,7 +43,8 @@ async def main():
         "--delay",
         type=int,
         default=10,
-        help="Delay in seconds between retries if Shazam API call fails (default: 10)",
+        help="Delay in seconds between retries if Shazam API call fails"
+        "(default: 10)",
     )
     parser.add_argument(
         "-n",
@@ -89,6 +91,13 @@ async def main():
         action="store_true",
         help="Organize output into Plex structure: Artist/Album/Title.ext",
     )
+    parser.add_argument(
+        "-c",
+        "--copy",
+        type=str,
+        default=None,
+        help="Copy files to this directory instead of moving them",
+    )
 
     args = parser.parse_args()
 
@@ -105,6 +114,7 @@ async def main():
             extensions=exts,
             output_dir=args.output,
             plex_structure=args.plex,
+            copy_path=args.copy,
         )
 
 
