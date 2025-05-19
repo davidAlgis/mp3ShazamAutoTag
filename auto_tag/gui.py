@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import shutil
 import sys
 import threading
 import time
@@ -14,9 +15,6 @@ from shazamio import Shazam
 from auto_tag.audio_recognize import (recognize_and_rename_file,
                                       update_mp3_cover_art, update_mp3_tags,
                                       update_ogg_tags)
-
-# project helpers ────────────────────────────────────────────────────────────
-
 
 # shared results list between worker thread and main thread
 RESULTS: list[dict] = []
@@ -30,37 +28,50 @@ def _base_dir() -> str:
     return os.path.abspath(os.path.join(here, os.pardir))
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Main GUI class
-# ─────────────────────────────────────────────────────────────────────────────
 class MP3RenamerGUI:
     def __init__(self, root: tk.Tk) -> None:
         self.root = root
         self.root.title("MP3 Shazam Auto Tag")
-
         self.data: list[dict] = []
         self.editing_entry: tk.Entry | None = None
         self.total_files = 0
         self.start_time: float | None = None
 
+        # Copy-to controls
+        self.copy_enabled = tk.BooleanVar(value=False)
+        self.copy_dir = tk.StringVar(value="")
+
         self._build_layout()
 
-    # ─────────────────────────────── layout ────────────────────────────────
     def _build_layout(self) -> None:
-        # top bar: directory picker
+        # Top bar: input directory + copy-to controls
         top = ttk.Frame(self.root, padding=10)
         top.pack(side=tk.TOP, fill=tk.X)
 
+        # Input directory
         ttk.Label(top, text="Input Directory:").pack(side=tk.LEFT)
         self.dir_var = tk.StringVar()
-        ttk.Entry(top, textvariable=self.dir_var, width=50).pack(
+        ttk.Entry(top, textvariable=self.dir_var, width=40).pack(
             side=tk.LEFT, padx=(5, 0)
         )
         ttk.Button(top, text="Browse", command=self._browse).pack(
             side=tk.LEFT, padx=5
         )
 
-        # progress bar
+        # Copy-to checkbox + directory
+        ttk.Checkbutton(
+            top,
+            text="Copy to:",
+            variable=self.copy_enabled,
+        ).pack(side=tk.LEFT, padx=(20, 0))
+        ttk.Entry(top, textvariable=self.copy_dir, width=30).pack(
+            side=tk.LEFT, padx=(5, 0)
+        )
+        ttk.Button(top, text="Browse", command=self._browse_copy).pack(
+            side=tk.LEFT, padx=5
+        )
+
+        # Progress bar
         pf = ttk.Frame(self.root, padding=10)
         pf.pack(fill=tk.X)
         self.progress = ttk.Progressbar(pf, mode="determinate")
@@ -68,7 +79,7 @@ class MP3RenamerGUI:
         self.progress_info = ttk.Label(pf, text="0/0, Remaining 0 s")
         self.progress_info.pack(side=tk.LEFT)
 
-        # results tree
+        # Results tree
         style = ttk.Style()
         style.configure("Custom.Treeview", rowheight=30, padding=5)
         style.configure("Custom.Treeview.Heading", padding=5)
@@ -82,19 +93,17 @@ class MP3RenamerGUI:
             show="headings",
             style="Custom.Treeview",
         )
-        self.tree.heading("apply", text="Apply")
-        self.tree.heading(
-            "old", text="Old Name", command=lambda: self._sort("old")
-        )
-        self.tree.heading(
-            "new", text="New Name", command=lambda: self._sort("new")
-        )
+        for col, text in [
+            ("apply", "Apply"),
+            ("old", "Old Name"),
+            ("new", "New Name"),
+        ]:
+            self.tree.heading(col, text=text)
         self.tree.column("apply", width=80, anchor="center")
         self.tree.column("old", width=300, anchor="w")
         self.tree.column("new", width=300, anchor="w")
         self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-        # vertical scrollbar wired correctly
         vscroll = ttk.Scrollbar(
             tree_wrap, orient="vertical", command=self.tree.yview
         )
@@ -104,12 +113,12 @@ class MP3RenamerGUI:
         self.tree.tag_configure("Yes", foreground="#5a7849")
         self.tree.tag_configure("No", foreground="#DB504A")
 
-        # events
+        # Bind events
         self.tree.bind("<Button-1>", self._on_click)
         self.tree.bind("<Return>", self._on_enter)
         self.tree.bind("<Double-1>", self._on_double_click)
 
-        # bottom buttons
+        # Bottom buttons
         bottom = ttk.Frame(self.root, padding=10)
         bottom.pack(side=tk.BOTTOM, fill=tk.X)
 
@@ -121,7 +130,6 @@ class MP3RenamerGUI:
             text="Apply with Plex Convention",
             command=lambda: self._apply(True),
         ).pack(side=tk.RIGHT, padx=5)
-
         ttk.Button(bottom, text="Uncheck All", command=self._uncheck_all).pack(
             side=tk.RIGHT, padx=5
         )
@@ -129,16 +137,18 @@ class MP3RenamerGUI:
             side=tk.RIGHT, padx=5
         )
 
-    # ────────────────────────── directory picker ───────────────────────────
     def _browse(self) -> None:
         directory = filedialog.askdirectory()
         if directory:
             self.dir_var.set(directory)
             self._start_recognition(directory)
 
-    # ───────────────────── background recognise worker ─────────────────────
+    def _browse_copy(self) -> None:
+        directory = filedialog.askdirectory()
+        if directory:
+            self.copy_dir.set(directory)
+
     def _start_recognition(self, directory: str) -> None:
-        # reset GUI
         for iid in self.tree.get_children():
             self.tree.delete(iid)
         self.data.clear()
@@ -189,6 +199,11 @@ class MP3RenamerGUI:
                     trace=False,
                     output_dir=None,
                     plex_structure=False,
+                    copy_to=(
+                        self.copy_dir.get()
+                        if self.copy_enabled.get()
+                        else None
+                    ),
                 )
                 res["apply"] = "error" not in res
             except Exception as exc:
@@ -205,7 +220,6 @@ class MP3RenamerGUI:
                 0, lambda d=idx, r=remaining: self._update_progress(d, r)
             )
 
-    # ─────────────────────────── tree helpers ──────────────────────────────
     def _update_progress(self, done: int, remaining: int) -> None:
         self.progress.config(value=done)
         self.progress_info.config(
@@ -229,7 +243,6 @@ class MP3RenamerGUI:
         if not self.data:
             messagebox.showinfo("Info", "No files were processed.")
 
-    # ───────────────────────── click / key events ──────────────────────────
     def _toggle(self, idx: int, iid) -> None:
         self.data[idx]["apply"] = not self.data[idx].get("apply", True)
         tag = "Yes" if self.data[idx]["apply"] else "No"
@@ -239,8 +252,9 @@ class MP3RenamerGUI:
     def _on_click(self, event) -> None:
         if self.tree.identify("region", event.x, event.y) != "cell":
             return
-        col, iid = self.tree.identify_column(event.x), self.tree.identify_row(
-            event.y
+        col, iid = (
+            self.tree.identify_column(event.x),
+            self.tree.identify_row(event.y),
         )
         if iid and col == "#1":
             self._toggle(self.tree.index(iid), iid)
@@ -253,16 +267,16 @@ class MP3RenamerGUI:
     def _on_double_click(self, event) -> None:
         if self.tree.identify("region", event.x, event.y) != "cell":
             return
-        col, iid = self.tree.identify_column(event.x), self.tree.identify_row(
-            event.y
+        col, iid = (
+            self.tree.identify_column(event.x),
+            self.tree.identify_row(event.y),
         )
         if not iid:
             return
         idx = self.tree.index(iid)
-
         if col in ("#1", "#2"):
             self._toggle(idx, iid)
-        elif col == "#3":  # edit new name
+        elif col == "#3":
             x, y, w, h = self.tree.bbox(iid, col)
             current = self.tree.set(iid, "new")
             self.editing_entry = tk.Entry(self.tree)
@@ -281,18 +295,15 @@ class MP3RenamerGUI:
             return
         new_val = self.editing_entry.get()
         self.tree.set(iid, "new", new_val)
-
         idx = self.tree.index(iid)
         old_new = self.data[idx].get("new_file_path", "")
         dirpath = os.path.dirname(old_new) if old_new else ""
         self.data[idx]["new_file_path"] = (
             os.path.join(dirpath, new_val) if dirpath else new_val
         )
-
         self.editing_entry.destroy()
         self.editing_entry = None
 
-    # ───────────────────────────── sorting ────────────────────────────────
     def _sort(self, key: str) -> None:
         if key == "old":
             self.data.sort(
@@ -304,7 +315,6 @@ class MP3RenamerGUI:
                     d.get("new_file_path", "")
                 ).lower()
             )
-
         for iid in self.tree.get_children():
             self.tree.delete(iid)
         for res in self.data:
@@ -320,7 +330,6 @@ class MP3RenamerGUI:
                 tags=(tag,),
             )
 
-    # ───────────────────────────── bulk toggle ────────────────────────────
     def _check_all(self) -> None:
         for idx, res in enumerate(self.data):
             res["apply"] = True
@@ -335,34 +344,39 @@ class MP3RenamerGUI:
             self.tree.set(iid, "apply", "No")
             self.tree.item(iid, tags=("No",))
 
-    # ───────────────────────────────── APPLY ──────────────────────────────
     def _apply(self, plex: bool) -> None:
         errors: list[str] = []
+        copy_to = self.copy_dir.get() if self.copy_enabled.get() else None
 
         for res in self.data:
             if not res.get("apply"):
                 continue
-
             src = res.get("file_path")
             if not src or not os.path.exists(src):
                 continue
 
-            # metadata from Shazam (already sanitised)
-            title: str = res.get("title", "Unknown Title")
-            artist: str = res.get("author", "Unknown Artist")
-            album: str = res.get("album", "Unknown Album")
+            title = res.get("title", "Unknown Title")
+            artist = res.get("author", "Unknown Artist")
+            album = res.get("album", "Unknown Album")
             ext = os.path.splitext(src)[1].lower()
 
             if plex:
                 base_dir = os.path.join(os.path.dirname(src), artist, album)
-                os.makedirs(base_dir, exist_ok=True)
+            else:
+                base_dir = os.path.dirname(src)
+            if copy_to:
+                base_dir = copy_to
+                if plex:
+                    base_dir = os.path.join(base_dir, artist, album)
+            os.makedirs(base_dir, exist_ok=True)
+
+            if plex:
                 dest = os.path.join(base_dir, f"{title}{ext}")
             else:
                 dest = res.get("new_file_path") or os.path.join(
-                    os.path.dirname(src), f"{title}{ext}"
+                    base_dir, f"{title}{ext}"
                 )
 
-            # ensure unique
             counter, unique = 1, dest
             while os.path.exists(unique):
                 root, ext2 = os.path.splitext(dest)
@@ -370,15 +384,17 @@ class MP3RenamerGUI:
                 counter += 1
 
             try:
-                os.rename(src, unique)
+                if copy_to:
+                    shutil.copy2(src, unique)
+                else:
+                    os.rename(src, unique)
 
-                # write tags/cover based on extension
                 if ext == ".mp3":
                     update_mp3_tags(unique, title, artist, album)
                     update_mp3_cover_art(
                         unique, res.get("cover_link", ""), trace=False
                     )
-                elif ext == ".ogg":
+                else:
                     update_ogg_tags(
                         unique,
                         title,
@@ -396,14 +412,12 @@ class MP3RenamerGUI:
             messagebox.showinfo("Success", "Changes applied successfully.")
 
 
-# ─────────────────────────────── entry point ───────────────────────────────
 def launch_gui() -> None:
     root = tk.Tk()
     try:
         root.iconbitmap(os.path.join(_base_dir(), "assets", "auto_tag.ico"))
     except Exception:
-        pass  # icon is optional
-
+        pass
     MP3RenamerGUI(root)
     root.mainloop()
 
