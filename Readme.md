@@ -11,13 +11,14 @@ This Python project automatically recognizes mp3 or ogg files using Shazam, rena
 
 ### Graphical User Interface (GUI)
 
-A user‑friendly executable is now available as a zip file (download link above). This GUI allows you to:
+A user-friendly executable is now available as a zip file (download link above). This GUI allows you to:
 - Select the input directory via a browse button.
+- Optionally check **Copy to:** and choose a destination folder to **copy** (rather than move) the files.
 - See a progress bar with file count and estimated remaining time.
-- View a table of MP3 files with options to check/uncheck rows and directly edit the new file names.
-- There are two different way to apply the changes :
-  1. The "Apply" button just change the name of the file.
-  2. The "Apply with Plex Convention" organize into Artist\Album\title_of_song
+- View a table of audio files with options to check/uncheck rows and directly edit the new file names.
+- There are two ways to apply changes:
+  1. The **Apply** button renames/moves (or copies, if **Copy to:** is set) in-place.
+  2. **Apply with Plex Convention** also organizes into `Artist/Album/title.ext`.
 
 Simply unzip the file and run the executable.
 
@@ -46,18 +47,19 @@ python main.py [options]
 
 ### Options
 
-| Short | Long           | Description                                                                                             | Default       |
-| ----- | -------------- | ------------------------------------------------------------------------------------------------------- | ------------- |
-| `-di` | `--directory`  | Directory where audio files are located. If not specified, the current working directory is used.       | *cwd*         |
-| `-m`  | `--modify`     | Apply modifications to tags and filenames (`True`/`False`).                                             | `True`        |
-| `-de` | `--delay`      | Delay (in seconds) before retrying Shazam if the call fails.                                            | `10`          |
-| `-n`  | `--nbrRetry`   | Number of retries if Shazam fails.                                                                      | `3`           |
-| `-tr` | `--trace`      | Enable tracing output (debug).                                                                          | `False`       |
-| `-g`  | `--gui`        | Launch the GUI instead of running headless.                                                             | `True`       |
-| `-e`  | `--extensions` | Comma-separated list of extensions to process (e.g. `mp3,ogg`).                                         | `mp3,ogg`     |
-| `-o`  | `--output`     | Base output directory for moved files (keeps original folder if omitted).                               | *same folder* |
-| `-p`     | `--plex`       | Organise output into Plex structure `Artist/Album/Title.ext` (CLI equivalent of the GUI’s Plex button). | *off*         |
-| `-h`  | `--help`       | Show the help message and exit.                                                                         | —             |
+| Short | Long           | Description                                                                                                   | Default       |
+| ----- | -------------- | ------------------------------------------------------------------------------------------------------------- | ------------- |
+| `-di` | `--directory`  | Directory where audio files are located. If not specified, the current working directory is used.             | *cwd*         |
+| `-m`  | `--modify`     | Apply modifications to tags and filenames (`True`/`False`).                                                   | `True`        |
+| `-de` | `--delay`      | Delay (in seconds) before retrying Shazam if the call fails.                                                  | `10`          |
+| `-n`  | `--nbrRetry`   | Number of retries if Shazam fails.                                                                            | `3`           |
+| `-tr` | `--trace`      | Enable tracing output (debug).                                                                                | `False`       |
+| `-g`  | `--gui`        | Launch the GUI instead of running headless.                                                                   | `True`        |
+| `-e`  | `--extensions` | Comma-separated list of extensions to process (e.g. `mp3,ogg`).                                               | `mp3,ogg`     |
+| `-o`  | `--output`     | Base output directory for moved files (keeps original folder if omitted).                                     | *same folder* |
+| `-p`  | `--plex`       | Organise output into Plex structure `Artist/Album/Title.ext` (CLI equivalent of the GUI’s Plex button).       | *off*         |
+| `-c`  | `--copy-to`    | **(New)** Instead of moving, **copy** processed files into this directory (can still use `--plex` structure). | *None*        |
+| `-h`  | `--help`       | Show the help message and exit.                                                                               | —             |
 
 
 ## Building the Executable
